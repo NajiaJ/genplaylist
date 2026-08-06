@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Playlist Generator</title>
+
+    <link rel="stylesheet" href="style.css">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <script src="https://kit.fontawesome.com/6c7f6d4d55.js" crossorigin="anonymous"></script>
+</head>
+
+<body>
+
+    <!-- Navigation -->
+
+    <nav>
+
+        <div class="logo">
+            <i class="fa-brands fa-spotify"></i>
+            <h2>PlaylistAI</h2>
+        </div>
+
+        <button id="loginBtn" class="spotify-btn">
+            Connect Spotify
+        </button>
+
+    </nav>
+
+    <!-- Hero -->
+
+    <header class="hero">
+
+        <div class="hero-text">
+
+            <h1>Create the Perfect Playlist in One Click.</h1>
+
+            <p>
+                Choose your favourite libraries, select your intention,
+                and let PlaylistAI generate a playlist built around
+                your own music.
+            </p>
+
+            <button id="startBtn" class="primary-btn">
+                Generate Playlist
+            </button>
+
+        </div>
+
+    </header>
+
+    <!-- Dashboard -->
+
+    <main class="dashboard">
+
+        <!-- Libraries -->
+
+        <section class="card">
+
+            <h2>
+                <i class="fa-solid fa-folder-open"></i>
+                Your Libraries
+            </h2>
+
+            <p>Select the playlists you trust.</p>
+
+            <div class="library-list">
+
+                <label class="library-item">
+                    <input type="checkbox" checked>
+                    Main Playlist
+                </label>
+
+                <label class="library-item">
+                    <input type="checkbox" checked>
+                    Liked Songs
+                </label>
+
+                <label class="library-item">
+                    <input type="checkbox">
+                    Study Playlist
+                </label>
+
+                <label class="library-item">
+                    <input type="checkbox">
+                    Sleep Playlist
+                </label>
+
+                <label class="library-item">
+                    <input type="checkbox">
+                    Road Trip
+                </label>
+
+            </div>
+
+        </section>
+
+        <!-- Top Songs -->
+
+        <section class="card">
+
+            <h2>
+                <i class="fa-solid fa-fire"></i>
+                Current Favourite Songs
+            </h2>
+
+            <p>Select songs you want the playlist to revolve around.</p>
+
+            <div class="song-grid">
+
+                <label class="song-card">
+                    <input type="checkbox" checked>
+                    Song One
+                </label>
+
+                <label class="song-card">
+                    <input type="checkbox" checked>
+                    Song Two
+                </label>
+
+                <label class="song-card">
+                    <input type="checkbox">
+                    Song Three
+                </label>
+
+                <label class="song-card">
+                    <input type="checkbox">
+                    Song Four
+                </label>
+
+                <label class="song-card">
+                    <input type="checkbox">
+                    Song Five
+                </label>
+
+                <label class="song-card">
+                    <input type="checkbox">
+                    Song Six
+                </label>
+
+            </div>
+
+        </section>
+
+        <!-- Playlist Intent -->
+
+        <section class="card">
+
+            <h2>
+                <i class="fa-solid fa-sliders"></i>
+                Playlist Intention
+            </h2>
+
+            <div class="intent-grid">
+
+                <button class="intent selected">
+                    Current Favourites
+                </button>
+
+                <button class="intent">
+                    Rediscover Old Favourites
+                </button>
+
+                <button class="intent">
+                    Balanced Mix
+                </button>
+
+                <button class="intent">
+                    Surprise Me
+                </button>
+
+            </div>
+
+        </section>
+
+        <!-- Playlist Settings -->
+
+        <section class="card">
+
+            <h2>
+                <i class="fa-solid fa-list"></i>
+                Playlist Settings
+            </h2>
+
+            <div class="settings">
+
+                <div>
+
+                    <label>Playlist Name</label>
+
+                    <input
+                        type="text"
+                        placeholder="Morning Commute Mix">
+
+                </div>
+
+                <div>
+
+                    <label>Playlist Size</label>
+
+                    <select>
+
+                        <option>25 Songs</option>
+                        <option selected>50 Songs</option>
+                        <option>75 Songs</option>
+                        <option>100 Songs</option>
+
+                    </select>
+
+                </div>
+
+            </div>
+
+        </section>
+
+        <!-- Generate -->
+
+        <section class="generate-section">
+
+            <button id="generateBtn" class="generate-btn">
+
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+
+                Generate Playlist
+
+            </button>
+
+        </section>
+
+        <!-- Loading -->
+
+        <section id="loading" class="loading hidden">
+
+            <div class="spinner"></div>
+
+            <h3>Generating your playlist...</h3>
+
+            <p>
+                Analysing your favourite songs,
+                playlists and listening preferences.
+            </p>
+
+        </section>
+
+        <!-- Playlist Result -->
+
+        <section id="result" class="result hidden">
+
+            <div class="result-header">
+
+                <div>
+
+                    <h2>Your Playlist is Ready 🎵</h2>
+
+                    <p>
+                        Built from your selected libraries and
+                        playlist intention.
+                    </p>
+
+                </div>
+
+                <button class="spotify-btn">
+
+                    Save to Spotify
+
+                </button>
+
+            </div>
+
+            <div class="playlist-preview">
+
+                <div class="track">
+
+                    <div class="album-art"></div>
+
+                    <div>
+
+                        <h4>Song Name</h4>
+
+                        <span>Artist</span>
+
+                    </div>
+
+                </div>
+
+                <div class="track">
+
+                    <div class="album-art"></div>
+
+                    <div>
+
+                        <h4>Song Name</h4>
+
+                        <span>Artist</span>
+
+                    </div>
+
+                </div>
+
+                <div class="track">
+
+                    <div class="album-art"></div>
+
+                    <div>
+
+                        <h4>Song Name</h4>
+
+                        <span>Artist</span>
+
+                    </div>
+
+                </div>
+
+                <div class="track">
+
+                    <div class="album-art"></div>
+
+                    <div>
+
+                        <h4>Song Name</h4>
+
+                        <span>Artist</span>
+
+                    </div>
+
+                </div>
+
+                <div class="track">
+
+                    <div class="album-art"></div>
+
+                    <div>
+
+                        <h4>Song Name</h4>
+
+                        <span>Artist</span>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+
+    <footer>
+
+        <p>
+            PlaylistAI Prototype • Human-Centred Design Project
+        </p>
+
+    </footer>
+
+    <script src="script.js"></script>
+
+</body>
+
+</html>
