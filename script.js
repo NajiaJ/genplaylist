@@ -1,5 +1,5 @@
 // ==========================================
-// PlaylistAI Prototype
+// GenPlaylist Prototype
 // Human-Centred Design Project
 // ==========================================
 
@@ -51,7 +51,7 @@ const saveDbBtn = document.getElementById("saveDbBtn");
 // silent failures, console-only logs, or blocking alert().
 
 function showError(message, { retry } = {}) {
-    console.error("[PlaylistAI error]", message);
+    console.error("[GenPlaylist error]", message);
 
     errorBannerText.textContent = message;
     errorBanner.classList.remove("hidden");
@@ -361,7 +361,7 @@ document.addEventListener("click", function (event) {
 console.log(
 `
 ======================================
- PlaylistAI Prototype
+ GenPlaylist Prototype
 ======================================
 
 Current Intention:
