@@ -117,9 +117,12 @@ let supabaseClient = null;
 function getSupabaseClient() {
     if (supabaseClient) return supabaseClient;
 
+    const PLACEHOLDER_URL = "PASTE_YOUR_SUPABASE_PROJECT_URL_HERE";
+    const PLACEHOLDER_KEY = "PASTE_YOUR_SUPABASE_ANON_KEY_HERE";
+
     if (
-        !SUPABASE_URL || SUPABASE_URL === "https://nyxawdoedmqtmtoihsmx.supabase.co" ||
-        !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY === "sb_publishable_vNeLmLSYzA2tgZ3Wz_vX3A_JM5rG_Z3"
+        !SUPABASE_URL || SUPABASE_URL === PLACEHOLDER_URL ||
+        !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY === PLACEHOLDER_KEY
     ) {
         throw new Error("SUPABASE_NOT_CONFIGURED");
     }
