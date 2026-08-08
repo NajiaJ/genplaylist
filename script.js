@@ -34,8 +34,71 @@ const loadingSection = document.getElementById("loading");
 const resultSection = document.getElementById("result");
 
 const playlistPreview = document.querySelector(".playlist-preview");
+const libraryList = document.getElementById("libraryList");
+const songGrid = document.getElementById("songGrid");
 
 const intentionButtons = document.querySelectorAll(".intent");
+
+const errorBanner = document.getElementById("errorBanner");
+const errorBannerText = document.getElementById("errorBannerText");
+const errorBannerDismiss = document.getElementById("errorBannerDismiss");
+
+// =====================================================
+// Error Handling Layer
+// =====================================================
+// Central place for surfacing errors to the user instead of
+// silent failures, console-only logs, or blocking alert().
+ 
+function showError(message, { retry } = {}) {
+    console.error("[PlaylistAI error]", message);
+ 
+    errorBannerText.textContent = message;
+    errorBanner.classList.remove("hidden");
+ 
+    // remove any previous retry button before adding a new one
+    const existingRetry = errorBanner.querySelector(".retry-btn");
+    if (existingRetry) existingRetry.remove();
+ 
+    if (typeof retry === "function") {
+        const retryBtn = document.createElement("button");
+        retryBtn.className = "retry-btn";
+        retryBtn.textContent = "Retry";
+        retryBtn.addEventListener("click", () => {
+            clearError();
+            retry();
+        });
+        errorBanner.insertBefore(retryBtn, errorBannerDismiss);
+    }
+}
+ 
+function clearError() {
+    errorBanner.classList.add("hidden");
+    errorBannerText.textContent = "";
+    const existingRetry = errorBanner.querySelector(".retry-btn");
+    if (existingRetry) existingRetry.remove();
+}
+ 
+errorBannerDismiss.addEventListener("click", clearError);
+ 
+// Catch anything that slips past local try/catch blocks —
+// e.g. a rejected promise nobody awaited, or a genuine bug.
+window.addEventListener("error", (event) => {
+    showError("Something unexpected went wrong. Please refresh and try again.");
+});
+window.addEventListener("unhandledrejection", (event) => {
+    showError("Something unexpected went wrong. Please refresh and try again.");
+});
+ 
+// Network status — most "random" failures during development
+// are actually just Wi-Fi dropping mid-request.
+window.addEventListener("offline", () => {
+    showError("You're offline. Reconnect to continue using Spotify features.");
+});
+window.addEventListener("online", clearError);
+ 
+function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 // -----------------------------
 // State

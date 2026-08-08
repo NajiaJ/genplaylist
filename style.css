@@ -386,6 +386,104 @@ button {
 
 }
 
+.placeholder-text {
+
+    grid-column: 1 / -1;
+
+    color: var(--text-secondary);
+
+    font-size: .9rem;
+
+}
+
+/* ---------- Error Banner ---------- */
+
+.error-banner {
+
+    position: sticky;
+
+    top: 0;
+
+    z-index: 1000;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    gap: 16px;
+
+    background: #3a1a1a;
+
+    color: #ffb4a3;
+
+    border-bottom: 1px solid #6b2c22;
+
+    padding: 12px 24px;
+
+    font-size: .9rem;
+
+}
+
+.error-banner button {
+
+    background: none;
+
+    color: #ffb4a3;
+
+    font-size: 1.3rem;
+
+    line-height: 1;
+
+    padding: 0 4px;
+
+}
+
+.error-banner button:hover {
+
+    color: white;
+
+}
+
+/* ---------- Inline field errors ---------- */
+
+.field-error {
+
+    color: #ff8a75;
+
+    font-size: .8rem;
+
+    margin-top: 6px;
+
+}
+
+/* ---------- Retry button ---------- */
+
+.retry-btn {
+
+    background: var(--surface-light);
+
+    color: white;
+
+    border: 1px solid var(--spotify-green);
+
+    padding: 8px 18px;
+
+    border-radius: 30px;
+
+    font-size: .85rem;
+
+    margin-top: 12px;
+
+}
+
+.retry-btn:hover {
+
+    background: var(--spotify-green);
+
+}
+
 /* ==========================================
    PlaylistAI
    styles.css
