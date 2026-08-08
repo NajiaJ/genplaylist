@@ -426,6 +426,12 @@ button {
 
 }
 
+.error-banner.hidden {
+
+    display: none;
+
+}
+
 .error-banner button {
 
     background: none;
