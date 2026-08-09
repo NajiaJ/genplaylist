@@ -98,8 +98,8 @@ let supabaseClient = null;
 function getSupabaseClient() {
     if (supabaseClient) return supabaseClient;
 
-    const PLACEHOLDER_URL = "PASTE_YOUR_SUPABASE_PROJECT_URL_HERE";
-    const PLACEHOLDER_KEY = "PASTE_YOUR_SUPABASE_ANON_KEY_HERE";
+    const PLACEHOLDER_URL = "https://nyxawdoedmqtmtoihsmx.supabase.co";
+    const PLACEHOLDER_KEY = "sb_publishable_vNeLmLSYzA2tgZ3Wz_vX3A_JM5rG_Z3";
 
     if (
         !SUPABASE_URL || SUPABASE_URL === PLACEHOLDER_URL ||
@@ -167,7 +167,7 @@ saveDbBtn.addEventListener("click", () => {
 // Register an app at https://developer.spotify.com/dashboard
 // and add this page's exact URL as a Redirect URI there.
 
-const SPOTIFY_CLIENT_ID = "PASTE_YOUR_SPOTIFY_CLIENT_ID_HERE";
+const SPOTIFY_CLIENT_ID = "147cdfbc274741aa9adc2ecdf0b24bc6";
 const REDIRECT_URI = window.location.origin + window.location.pathname;
 const SPOTIFY_SCOPES = [
     "playlist-read-private",
@@ -195,7 +195,8 @@ async function pkceChallenge() {
 }
 
 async function redirectToSpotifyLogin() {
-    if (!SPOTIFY_CLIENT_ID || SPOTIFY_CLIENT_ID === "PASTE_YOUR_SPOTIFY_CLIENT_ID_HERE") {
+    const PLACEHOLDER_CLIENT_ID = "147cdfbc274741aa9adc2ecdf0b24bc6";
+    if (!SPOTIFY_CLIENT_ID || SPOTIFY_CLIENT_ID === PLACEHOLDER_CLIENT_ID) {
         showError("No Spotify Client ID is set. Add yours near the top of script.js before connecting.");
         return;
     }
