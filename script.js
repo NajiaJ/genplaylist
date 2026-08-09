@@ -195,7 +195,7 @@ async function pkceChallenge() {
 }
 
 async function redirectToSpotifyLogin() {
-    const PLACEHOLDER_CLIENT_ID = "147cdfbc274741aa9adc2ecdf0b24bc6";
+    const PLACEHOLDER_CLIENT_ID = "PASTE_YOUR_SPOTIFY_CLIENT_ID_HERE";
     if (!SPOTIFY_CLIENT_ID || SPOTIFY_CLIENT_ID === PLACEHOLDER_CLIENT_ID) {
         showError("No Spotify Client ID is set. Add yours near the top of script.js before connecting.");
         return;
