@@ -98,8 +98,8 @@ let supabaseClient = null;
 function getSupabaseClient() {
     if (supabaseClient) return supabaseClient;
 
-    const PLACEHOLDER_URL = "https://nyxawdoedmqtmtoihsmx.supabase.co";
-    const PLACEHOLDER_KEY = "sb_publishable_vNeLmLSYzA2tgZ3Wz_vX3A_JM5rG_Z3";
+    const PLACEHOLDER_URL = "PASTE_YOUR_SUPABASE_PROJECT_URL_HERE";
+    const PLACEHOLDER_KEY = "PASTE_YOUR_SUPABASE_ANON_KEY_HERE";
 
     if (
         !SUPABASE_URL || SUPABASE_URL === PLACEHOLDER_URL ||
@@ -388,7 +388,10 @@ function renderLibraries(playlists, likedCount) {
     playlists.forEach(p => {
         const label = document.createElement("label");
         label.className = "library-item";
-        label.innerHTML = `<input type="checkbox" checked data-id="${p.id}" data-count="${p.tracks.total}"> ${escapeHtml(p.name)} (${p.tracks.total})`;
+        // Feb 2026 rename: playlist objects may expose this summary
+        // under `items` instead of `tracks` — support both.
+        const trackCount = (p.tracks && p.tracks.total) ?? (p.items && p.items.total) ?? "?";
+        label.innerHTML = `<input type="checkbox" checked data-id="${p.id}" data-count="${trackCount}"> ${escapeHtml(p.name)} (${trackCount})`;
         libraryList.appendChild(label);
     });
 }
