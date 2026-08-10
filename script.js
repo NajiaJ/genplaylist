@@ -172,6 +172,8 @@ const REDIRECT_URI = window.location.origin + window.location.pathname;
 const SPOTIFY_SCOPES = [
     "playlist-read-private",
     "playlist-read-collaborative",
+    "playlist-modify-public",
+    "playlist-modify-private",
     "user-library-read",
     "user-top-read",
     "user-read-recently-played"
@@ -748,24 +750,320 @@ function shuffle(array) {
 
 }
 
-// -----------------------------
-// Save to Spotify (Mock)
-// -----------------------------
+// =====================================================
+// Save Generated Playlist to Spotify
+// =====================================================
+// This takes the playlist currently displayed on the page,
+// creates a real playlist in the connected Spotify account,
+// then adds the generated tracks using their Spotify URIs.
+//
+// Supabase is NOT involved in this process.
 
-document.addEventListener("click", function (event) {
+async function savePlaylistToSpotify() {
 
-    if (!event.target.classList.contains("spotify-btn"))
+    const spotifyButton =
+        Array.from(document.querySelectorAll(".spotify-btn"))
+        .find(button =>button.innerText.trim() === "Save to Spotify");
+
+    if (!spotifyButton) {showError("Couldn't find the Spotify save button.");
         return;
+    }
 
-    if (event.target.innerText !== "Save to Spotify")
+    if (!spotifyAccessToken) {showError("Connect your Spotify account first.");
         return;
+    }
 
-    event.target.innerText = "Saved ✓";
+    // Get the tracks currently displayed
+    // in the generated playlist.
+    const tracks = Array.from(playlistPreview.querySelectorAll(".track"));
 
-    event.target.disabled = true;
+    if (tracks.length === 0) 
+    {
+        showError("Generate a playlist first before saving it to Spotify.");
+        return;
+    }
 
-    alert(
-        "Playlist exported successfully!\n\n(In the final version this would create a Spotify playlist using the Spotify Web API.)"
-    );
+    // Extract Spotify URIs.
+    const trackUris =
+        tracks.map(track => track.dataset.uri)
+            .filter(uri => uri && uri.startsWith("spotify:track:"));
 
-});
+    if (trackUris.length === 0) {
+        showError("The generated playlist doesn't contain any valid Spotify tracks.");
+        return;
+    }
+
+    const nameInput = document.querySelector('.settings input[type="text"]');
+
+    const playlistName =
+        nameInput &&
+        nameInput.value.trim()
+            ? nameInput.value.trim()
+            : "GenPlaylist Mix";
+
+    spotifyButton.disabled = true;
+
+    spotifyButton.textContent = "Saving…";
+
+    try {
+
+        // -----------------------------------------
+        // Step 1: Get the current Spotify user
+        // -----------------------------------------
+
+        const currentUser =
+            await spotifyFetch(
+                "/me"
+            );
+
+        // -----------------------------------------
+        // Step 2: Create the playlist
+        // -----------------------------------------
+
+        const createdPlaylist =
+            await createSpotifyPlaylist(
+                currentUser.id,
+                playlistName
+            );
+
+        // -----------------------------------------
+        // Step 3: Add generated tracks
+        // -----------------------------------------
+
+        await addTracksToSpotifyPlaylist(
+            createdPlaylist.id,
+            trackUris
+        );
+
+        spotifyButton.textContent =
+            "Saved to Spotify ✓";
+
+        clearError();
+
+        // Open the newly-created Spotify
+        // playlist in a new tab.
+        if (
+            createdPlaylist.external_urls &&
+            createdPlaylist.external_urls.spotify
+        ) {
+            window.open(
+                createdPlaylist.external_urls.spotify,
+                "_blank",
+                "noopener,noreferrer"
+            );
+        }
+
+    } catch (err) {
+        console.error(
+            "[GenPlaylist Spotify save error]",
+            err
+        );
+
+        spotifyButton.disabled =
+            false;
+
+        spotifyButton.textContent =
+            "Save to Spotify";
+
+        if (
+            err.message ===
+            "AUTH_EXPIRED"
+        ) {
+            handleAuthExpired();
+            return;
+        }
+
+        if (
+            err.message ===
+            "FORBIDDEN"
+        ) {
+            showError(
+                "Spotify denied permission to create playlists. Please reconnect Spotify and approve the playlist permissions."
+            );
+
+            return;
+        }
+
+        showError(
+            "Couldn't save the generated playlist to Spotify. Please try again.",
+            {
+                retry:
+                    savePlaylistToSpotify
+            }
+        );
+    }
+}
+
+// =====================================================
+// Create Spotify Playlist
+// =====================================================
+
+async function createSpotifyPlaylist(
+    userId,
+    playlistName
+) {
+    const body = {
+        name: playlistName,
+        public: false,
+        collaborative: false,
+        description:
+            `Generated by GenPlaylist • ${selectedIntent}`
+    };
+
+    // Spotify's current playlist creation endpoint
+    // creates a playlist for the authenticated user.
+    const response = await spotifyFetch("/me/playlists");
+
+    // The generic spotifyFetch helper is GET-oriented,
+    // so playlist creation needs its own POST request.
+    // The response above is intentionally not used.
+    void response;
+
+    let res;
+
+    try {
+        res = await fetch(
+            "https://api.spotify.com/v1/me/playlists",
+            {
+                method: "POST",
+
+                headers: {
+                    Authorization:
+                        `Bearer ${spotifyAccessToken}`,
+
+                    "Content-Type":
+                        "application/json"
+                },
+
+                body:
+                    JSON.stringify(body)
+            }
+        );
+
+    } catch (networkErr) {
+        throw new Error(
+            "NETWORK_ERROR"
+        );
+    }
+
+    if (res.status === 401) {
+        throw new Error(
+            "AUTH_EXPIRED"
+        );
+    }
+
+    if (res.status === 403) {
+        throw new Error(
+            "FORBIDDEN"
+        );
+    }
+
+    if (!res.ok) {
+        throw new Error(
+            `SPOTIFY_PLAYLIST_CREATE_${res.status}`
+        );
+    }
+
+    return res.json();
+}
+
+// =====================================================
+// Add Tracks to Spotify Playlist
+// =====================================================
+// Spotify accepts up to 100 track URIs per request,
+// so larger generated playlists are automatically
+// split into batches.
+
+async function addTracksToSpotifyPlaylist(
+    playlistId,
+    trackUris
+) {
+    const CHUNK_SIZE = 100;
+
+    for (
+        let i = 0;
+        i < trackUris.length;
+        i += CHUNK_SIZE
+    ) {
+        const chunk =
+            trackUris.slice(
+                i,
+                i + CHUNK_SIZE
+            );
+
+        let res;
+
+        try {
+            res = await fetch(
+                `https://api.spotify.com/v1/playlists/${playlistId}/items`,
+                {
+                    method: "POST",
+
+                    headers: {
+                        Authorization:
+                            `Bearer ${spotifyAccessToken}`,
+
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body:
+                        JSON.stringify({
+                            uris: chunk
+                        })
+                }
+            );
+
+        } catch (networkErr) {
+            throw new Error(
+                "NETWORK_ERROR"
+            );
+        }
+
+        if (res.status === 401) {
+            throw new Error(
+                "AUTH_EXPIRED"
+            );
+        }
+
+        if (res.status === 403) {
+            throw new Error(
+                "FORBIDDEN"
+            );
+        }
+
+        if (!res.ok) {
+            throw new Error(
+                `SPOTIFY_PLAYLIST_TRACKS_${res.status}`
+            );
+        }
+    }
+}
+
+// =====================================================
+// Save to Spotify Button
+// =====================================================
+// This replaces the old mock alert() behavior.
+
+document.addEventListener(
+    "click",
+    function (event) {
+
+        if (
+            !event.target.classList.contains(
+                "spotify-btn"
+            )
+        ) {
+            return;
+        }
+
+        if (
+            event.target.innerText.trim() !==
+            "Save to Spotify"
+        ) {
+            return;
+        }
+
+        savePlaylistToSpotify();
+    }
+);
