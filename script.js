@@ -342,7 +342,7 @@ loginBtn.addEventListener("click", redirectToSpotifyLogin);
 
     try {
         await exchangeCodeForToken(code);
-        loginBtn.innerText = "Connected ✓";
+        loginBtn.innerText = "Connected to Spotify ✓";
         loginBtn.disabled = true;
         clearError();
         await loadLibrariesAndAnchors();
@@ -413,7 +413,8 @@ function renderTopSongs(tracks) {
     tracks.forEach(t => {
         const label = document.createElement("label");
         label.className = "song-card";
-        label.innerHTML = `<input type="checkbox" data-id="${t.id}" data-uri="${t.uri}" data-title="${escapeHtml(t.name)}" data-artist="${escapeHtml(t.artists.map(a => a.name).join(", "))}"> ${escapeHtml(t.name)} — ${escapeHtml(t.artists.map(a => a.name).join(", "))}`;
+        const image = getSmallestImage(t.album) || "";
+        label.innerHTML = `<input type="checkbox" data-id="${t.id}" data-uri="${t.uri}" data-title="${escapeHtml(t.name)}" data-artist="${escapeHtml(t.artists.map(a => a.name).join(", "))}" data-image="${image}"> ${escapeHtml(t.name)} — ${escapeHtml(t.artists.map(a => a.name).join(", "))}`;
         songGrid.appendChild(label);
     });
 }
@@ -494,7 +495,8 @@ async function generatePlaylist() {
         id: cb.dataset.id,
         uri: cb.dataset.uri,
         title: cb.dataset.title,
-        artist: cb.dataset.artist
+        artist: cb.dataset.artist,
+        image: cb.dataset.image || null
     }));
 
     const sizeSelect = document.querySelector(".settings select");
@@ -613,6 +615,13 @@ async function fetchSignalsWithFallback(pool) {
 // Scoring
 // -----------------------------
 
+// Spotify returns album art in a few sizes (usually 640/300/64px).
+// Thumbnails here are only ~60px, so the smallest one loads fastest.
+function getSmallestImage(album) {
+    if (!album || !album.images || album.images.length === 0) return null;
+    return album.images[album.images.length - 1].url;
+}
+
 function scorePool(pool, signals) {
     return pool.map(t => {
         let recency = 0;
@@ -637,6 +646,7 @@ function scorePool(pool, signals) {
             id: t.id,
             title: t.name,
             artist: (t.artists || []).map(a => a.name).join(", "),
+            image: getSmallestImage(t.album),
             url: t.external_urls ? t.external_urls.spotify : `https://open.spotify.com/track/${t.id}`,
             uri: t.uri,
             recency, dormancy, baseline,
@@ -662,7 +672,7 @@ function assemblePlaylist(scored, anchorTracks, intent, targetSize) {
     // anything the user manually picked as an anchor but that
     // wasn't in the fetched pool (edge case) still gets included
     const missingAnchors = anchorTracks.filter(a => !scored.some(t => t.id === a.id))
-        .map(a => ({ id: a.id, title: a.title, artist: a.artist, url: `https://open.spotify.com/track/${a.id}`, uri: a.uri, tag: "anchor" }));
+        .map(a => ({ id: a.id, title: a.title, artist: a.artist, image: a.image, url: `https://open.spotify.com/track/${a.id}`, uri: a.uri, tag: "anchor" }));
 
     const remainingPool = scored.filter(t => !anchorIds.has(t.id));
     const remainingSlots = Math.max(targetSize - anchors.length - missingAnchors.length, 0);
@@ -720,7 +730,9 @@ function createTrack(track) {
 
     container.innerHTML = `
 
-        <div class="album-art"></div>
+        ${track.image
+            ? `<img class="album-art" src="${track.image}" alt="" loading="lazy" onerror="this.outerHTML='<div class=&quot;album-art&quot;></div>'">`
+            : `<div class="album-art"></div>`}
 
         <div>
 

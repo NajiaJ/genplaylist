@@ -800,6 +800,10 @@ button {
 
     flex-shrink: 0;
 
+    object-fit: cover;
+
+    display: block;
+
 }
 
 /* ---------- Song Details ---------- */
