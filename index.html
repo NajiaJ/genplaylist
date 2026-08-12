@@ -4,55 +4,110 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>GenPlaylist</title>
+
     <link rel="stylesheet" href="style.css">
 
+    <!-- Google Font -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet"
+    >
 
-    <script src="https://kit.fontawesome.com/6c7f6d4d55.js" crossorigin="anonymous"></script>
+    <!-- Font Awesome -->
+    <script
+        src="https://kit.fontawesome.com/6c7f6d4d55.js"
+        crossorigin="anonymous"
+    ></script>
 </head>
 
 <body>
 
-    <!-- Error Banner -->
+    <!-- ==========================================
+         Error Banner
+    =========================================== -->
 
-    <div id="errorBanner" class="error-banner hidden" role="alert" aria-live="assertive">
+    <div
+        id="errorBanner"
+        class="error-banner hidden"
+        role="alert"
+        aria-live="assertive"
+    >
 
         <span id="errorBannerText"></span>
 
-        <button id="errorBannerDismiss" aria-label="Dismiss error">&times;</button>
+        <button
+            id="errorBannerDismiss"
+            type="button"
+            aria-label="Dismiss error"
+        >
+            &times;
+        </button>
 
     </div>
 
-    <!-- Navigation -->
+
+    <!-- ==========================================
+         Navigation
+    =========================================== -->
 
     <nav>
 
         <div class="logo">
+
             <i class="fa-brands fa-spotify"></i>
-            <h2>GenPlaylist</h2>
+
+            <h2>
+                GenPlaylist
+            </h2>
+
         </div>
 
-        <button id="loginBtn" class="spotify-btn">
+
+        <!--
+            IMPORTANT:
+            This is the ONLY element with id="loginBtn".
+            JavaScript uses this button for
+            Connect Spotify / Log Out.
+        -->
+
+        <button
+            id="loginBtn"
+            class="spotify-btn"
+            type="button"
+        >
             Connect Spotify
         </button>
 
     </nav>
 
 
-    <!-- Welcome / Hero -->
+    <!-- ==========================================
+         Welcome / Hero
+    =========================================== -->
 
-    <header class="hero" id="welcomeHero">
+    <header
+        class="hero"
+        id="welcomeHero"
+    >
 
         <div class="hero-text">
+
             <div class="welcome-icon">
+
                 <i class="fa-brands fa-spotify"></i>
+
             </div>
 
-            <h1> Create the Perfect Playlist in One Click. </h1>
+
+            <h1>
+                Create the Perfect Playlist in One Click.
+            </h1>
+
 
             <p>
                 Connect your Spotify account to build personalised
@@ -60,9 +115,23 @@
                 favourite songs.
             </p>
 
-            <button id="startBtn" class="primary-btn">
+
+            <!--
+                IMPORTANT:
+                This is startBtn, NOT loginBtn.
+                It starts the Spotify login flow.
+            -->
+
+            <button
+                id="startBtn"
+                class="primary-btn"
+                type="button"
+            >
+
                 <i class="fa-brands fa-spotify"></i>
+
                 Connect to Spotify
+
             </button>
 
         </div>
@@ -75,43 +144,68 @@
          Hidden until Spotify is connected
     =========================================== -->
 
-    <main class="dashboard hidden" id="dashboard">
+    <main
+        class="dashboard hidden"
+        id="dashboard"
+    >
+
 
         <!-- ======================================
              Libraries
         ======================================= -->
 
         <section class="card">
+
             <div class="section-heading">
+
                 <div>
+
                     <h2>
+
                         <i class="fa-solid fa-folder-open"></i>
+
                         Your Libraries
+
                     </h2>
 
                     <p>
                         Choose the playlists GenPlaylist can use.
                     </p>
+
                 </div>
 
 
                 <div class="selection-actions">
-                    <button type="button" id="selectAllPlaylists" class="secondary-btn">
+
+                    <button
+                        type="button"
+                        id="selectAllPlaylists"
+                        class="secondary-btn"
+                    >
                         Select All
                     </button>
 
-                    <button type="button" id="deselectAllPlaylists" class="secondary-btn">
+
+                    <button
+                        type="button"
+                        id="deselectAllPlaylists"
+                        class="secondary-btn"
+                    >
                         Deselect All
                     </button>
+
                 </div>
 
             </div>
 
 
-            <div class="library-list" id="libraryList">
+            <div
+                class="library-list"
+                id="libraryList"
+            >
 
                 <p class="placeholder-text">
-                    Loading your playlists…
+                    Connect to Spotify to see your playlists here.
                 </p>
 
             </div>
@@ -145,7 +239,7 @@
             >
 
                 <p class="placeholder-text">
-                    Loading your top songs…
+                    Connect to Spotify to see your top songs here.
                 </p>
 
             </div>
@@ -375,9 +469,11 @@
 
             <div class="spinner"></div>
 
+
             <h3>
                 Generating your playlist...
             </h3>
+
 
             <p>
                 Analysing your favourite songs,
@@ -403,6 +499,7 @@
                     <h2>
                         Your Playlist is Ready 🎵
                     </h2>
+
 
                     <p>
                         Built from your selected libraries and
@@ -436,11 +533,12 @@
             </div>
 
 
-            <div
-                class="playlist-preview"
-            >
+            <div class="playlist-preview">
 
-                <!-- Tracks inserted by JavaScript -->
+                <!--
+                    Generated tracks are inserted here
+                    by script.js.
+                -->
 
             </div>
 
@@ -460,6 +558,11 @@
         </p>
 
     </footer>
+
+
+    <!-- ==========================================
+         JavaScript
+    =========================================== -->
 
     <script src="script.js"></script>
 

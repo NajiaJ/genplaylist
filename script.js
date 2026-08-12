@@ -6,369 +6,89 @@
 
 
 // =====================================================
-// Elements
+// ELEMENTS
 // =====================================================
 
 const loginBtn = document.getElementById("loginBtn");
 const startBtn = document.getElementById("startBtn");
 const generateBtn = document.getElementById("generateBtn");
 
+const dashboard = document.getElementById("dashboard");
+const welcomeHero = document.getElementById("welcomeHero");
+
 const loadingSection = document.getElementById("loading");
 const resultSection = document.getElementById("result");
 
-const playlistPreview = document.querySelector(".playlist-preview");
-const libraryList = document.getElementById("libraryList");
-const songGrid = document.getElementById("songGrid");
+const playlistPreview =
+    document.querySelector(".playlist-preview");
 
-const intentionButtons = document.querySelectorAll(".intent");
+const libraryList =
+    document.getElementById("libraryList");
 
-const errorBanner = document.getElementById("errorBanner");
-const errorBannerText = document.getElementById("errorBannerText");
-const errorBannerDismiss = document.getElementById("errorBannerDismiss");
+const songGrid =
+    document.getElementById("songGrid");
 
-const saveDbBtn = document.getElementById("saveDbBtn");
+const intentionButtons =
+    document.querySelectorAll(".intent");
 
+const errorBanner =
+    document.getElementById("errorBanner");
 
-// =====================================================
-// Error Handling Layer
-// =====================================================
+const errorBannerText =
+    document.getElementById("errorBannerText");
 
-function showError(message, { retry } = {}) {
+const errorBannerDismiss =
+    document.getElementById("errorBannerDismiss");
 
-    console.error("[GenPlaylist error]", message);
+const saveDbBtn =
+    document.getElementById("saveDbBtn");
 
-    errorBannerText.textContent = message;
-    errorBanner.classList.remove("hidden");
+const saveSpotifyBtn =
+    document.getElementById("saveSpotifyBtn");
 
-    const existingRetry =
-        errorBanner.querySelector(".retry-btn");
+const selectAllPlaylists =
+    document.getElementById("selectAllPlaylists");
 
-    if (existingRetry) {
-        existingRetry.remove();
-    }
+const deselectAllPlaylists =
+    document.getElementById("deselectAllPlaylists");
 
-    if (typeof retry === "function") {
+const sizeMode =
+    document.getElementById("sizeMode");
 
-        const retryBtn =
-            document.createElement("button");
+const songCountSetting =
+    document.getElementById("songCountSetting");
 
-        retryBtn.className = "retry-btn";
-        retryBtn.textContent = "Retry";
+const durationSetting =
+    document.getElementById("durationSetting");
 
-        retryBtn.addEventListener("click", () => {
+const songCount =
+    document.getElementById("songCount");
 
-            clearError();
-
-            retry();
-
-        });
-
-        errorBanner.insertBefore(
-            retryBtn,
-            errorBannerDismiss
-        );
-    }
-}
-
-
-function clearError() {
-
-    errorBanner.classList.add("hidden");
-
-    errorBannerText.textContent = "";
-
-    const existingRetry =
-        errorBanner.querySelector(".retry-btn");
-
-    if (existingRetry) {
-        existingRetry.remove();
-    }
-}
-
-
-errorBannerDismiss.addEventListener(
-    "click",
-    clearError
-);
+const playlistDuration =
+    document.getElementById("playlistDuration");
 
 
 // =====================================================
-// Global Error Handling
+// APPLICATION STATE
 // =====================================================
 
-window.addEventListener("error", () => {
+let spotifyAccessToken = null;
 
-    showError(
-        "Something unexpected went wrong. Please refresh and try again."
-    );
-
-});
-
-
-window.addEventListener(
-    "unhandledrejection",
-    () => {
-
-        showError(
-            "Something unexpected went wrong. Please refresh and try again."
-        );
-
-    }
-);
+let selectedIntent = "Current Favourites";
 
 
 // =====================================================
-// Network Status
-// =====================================================
-
-window.addEventListener(
-    "offline",
-    () => {
-
-        showError(
-            "You're offline. Reconnect to continue using Spotify features."
-        );
-
-    }
-);
-
-
-window.addEventListener(
-    "online",
-    clearError
-);
-
-
-function sleep(ms) {
-
-    return new Promise(resolve => {
-        setTimeout(resolve, ms);
-    });
-
-}
-
-
-// =====================================================
-// Supabase
-// =====================================================
-
-const SUPABASE_URL =
-    "https://nyxawdoedmqtmtoihsmx.supabase.co";
-
-const SUPABASE_ANON_KEY =
-    "sb_publishable_vNeLmLSYzA2tgZ3Wz_vX3A_JM5rG_Z3";
-
-let supabaseClient = null;
-
-
-function getSupabaseClient() {
-
-    if (supabaseClient) {
-        return supabaseClient;
-    }
-
-    const PLACEHOLDER_URL =
-        "PASTE_YOUR_SUPABASE_PROJECT_URL_HERE";
-
-    const PLACEHOLDER_KEY =
-        "PASTE_YOUR_SUPABASE_ANON_KEY_HERE";
-
-
-    if (
-        !SUPABASE_URL ||
-        SUPABASE_URL === PLACEHOLDER_URL ||
-        !SUPABASE_ANON_KEY ||
-        SUPABASE_ANON_KEY === PLACEHOLDER_KEY
-    ) {
-
-        throw new Error(
-            "SUPABASE_NOT_CONFIGURED"
-        );
-
-    }
-
-
-    if (
-        !window.supabase ||
-        typeof window.supabase.createClient !== "function"
-    ) {
-
-        throw new Error(
-            "SUPABASE_LIBRARY_MISSING"
-        );
-
-    }
-
-
-    supabaseClient =
-        window.supabase.createClient(
-            SUPABASE_URL,
-            SUPABASE_ANON_KEY
-        );
-
-    return supabaseClient;
-}
-
-
-// =====================================================
-// Save Playlist to Supabase
-// =====================================================
-
-async function savePlaylistToDatabase(
-    tracks,
-    intent
-) {
-
-    saveDbBtn.disabled = true;
-    saveDbBtn.textContent = "Saving…";
-
-
-    try {
-
-        const client =
-            getSupabaseClient();
-
-
-        const nameInput =
-            document.querySelector(
-                '.settings input[type="text"]'
-            );
-
-
-        const { error } =
-            await client
-                .from("generated_playlists")
-                .insert({
-
-                    playlist_name:
-                        nameInput &&
-                        nameInput.value.trim()
-                            ? nameInput.value.trim()
-                            : null,
-
-                    intent: intent,
-
-                    track_count:
-                        tracks.length,
-
-                    tracks: tracks
-
-                });
-
-
-        if (error) {
-            throw error;
-        }
-
-
-        saveDbBtn.textContent =
-            "Saved ✓";
-
-        clearError();
-
-
-    } catch (err) {
-
-        console.error(
-            "[GenPlaylist Supabase error]",
-            err
-        );
-
-
-        saveDbBtn.disabled = false;
-
-        saveDbBtn.textContent =
-            "Save Playlist";
-
-
-        if (
-            err.message ===
-            "SUPABASE_NOT_CONFIGURED"
-        ) {
-
-            showError(
-                "Supabase isn't configured yet — add your project URL and anon key near the top of script.js."
-            );
-
-            return;
-        }
-
-
-        if (
-            err.message ===
-            "SUPABASE_LIBRARY_MISSING"
-        ) {
-
-            showError(
-                "The Supabase library could not be loaded. Please refresh and try again."
-            );
-
-            return;
-        }
-
-
-        showError(
-            "Couldn't save your playlist. Please try again.",
-            {
-                retry: () =>
-                    savePlaylistToDatabase(
-                        tracks,
-                        intent
-                    )
-            }
-        );
-
-    }
-}
-
-
-saveDbBtn.addEventListener(
-    "click",
-    () => {
-
-        const tracksToSave =
-            Array.from(
-                playlistPreview.querySelectorAll(".track")
-            ).map(el => ({
-
-                title:
-                    el.querySelector("h4")
-                        ?.textContent || "",
-
-                artist:
-                    el.querySelector("span")
-                        ?.textContent || ""
-
-            }));
-
-
-        if (tracksToSave.length === 0) {
-
-            showError(
-                "Generate a playlist first before saving."
-            );
-
-            return;
-        }
-
-
-        savePlaylistToDatabase(
-            tracksToSave,
-            selectedIntent
-        );
-
-    }
-);
-
-
-// =====================================================
-// Spotify Configuration
+// SPOTIFY CONFIGURATION
 // =====================================================
 
 const SPOTIFY_CLIENT_ID =
     "147cdfbc274741aa9adc2ecdf0b24bc6";
 
 
+// IMPORTANT:
+// This produces:
+// https://najiaj.github.io/genplaylist/
+// when the site is hosted there.
 const REDIRECT_URI =
     window.location.origin +
     window.location.pathname;
@@ -393,11 +113,276 @@ const SPOTIFY_SCOPES = [
 ].join(" ");
 
 
-let spotifyAccessToken = null;
+// =====================================================
+// SUPABASE CONFIGURATION
+// =====================================================
+
+const SUPABASE_URL =
+    "https://nyxawdoedmqtmtoihsmx.supabase.co";
+
+const SUPABASE_ANON_KEY =
+    "sb_publishable_vNeLmLSYzA2tgZ3Wz_vX3A_JM5rG_Z3";
+
+let supabaseClient = null;
 
 
 // =====================================================
-// PKCE Helpers
+// ERROR HANDLING
+// =====================================================
+
+function showError(message, { retry } = {}) {
+
+    console.error(
+        "[GenPlaylist error]",
+        message
+    );
+
+    if (!errorBanner || !errorBannerText) {
+        alert(message);
+        return;
+    }
+
+    errorBannerText.textContent = message;
+
+    errorBanner.classList.remove("hidden");
+
+
+    const existingRetry =
+        errorBanner.querySelector(".retry-btn");
+
+
+    if (existingRetry) {
+        existingRetry.remove();
+    }
+
+
+    if (typeof retry === "function") {
+
+        const retryBtn =
+            document.createElement("button");
+
+        retryBtn.className =
+            "retry-btn";
+
+        retryBtn.type =
+            "button";
+
+        retryBtn.textContent =
+            "Retry";
+
+
+        retryBtn.addEventListener(
+            "click",
+            () => {
+
+                clearError();
+
+                retry();
+
+            }
+        );
+
+
+        errorBanner.insertBefore(
+            retryBtn,
+            errorBannerDismiss
+        );
+
+    }
+
+}
+
+
+function clearError() {
+
+    if (!errorBanner) {
+        return;
+    }
+
+    errorBanner.classList.add("hidden");
+
+
+    if (errorBannerText) {
+        errorBannerText.textContent = "";
+    }
+
+
+    const existingRetry =
+        errorBanner.querySelector(".retry-btn");
+
+
+    if (existingRetry) {
+        existingRetry.remove();
+    }
+
+}
+
+
+if (errorBannerDismiss) {
+
+    errorBannerDismiss.addEventListener(
+        "click",
+        clearError
+    );
+
+}
+
+
+// =====================================================
+// GLOBAL ERROR HANDLING
+// =====================================================
+
+window.addEventListener(
+    "error",
+    event => {
+
+        console.error(
+            "[GenPlaylist window error]",
+            event.error || event.message
+        );
+
+        showError(
+            "Something unexpected went wrong. Please refresh and try again."
+        );
+
+    }
+);
+
+
+window.addEventListener(
+    "unhandledrejection",
+    event => {
+
+        console.error(
+            "[GenPlaylist promise error]",
+            event.reason
+        );
+
+        showError(
+            "Something unexpected went wrong. Please refresh and try again."
+        );
+
+    }
+);
+
+
+// =====================================================
+// NETWORK STATUS
+// =====================================================
+
+window.addEventListener(
+    "offline",
+    () => {
+
+        showError(
+            "You're offline. Reconnect to continue using Spotify features."
+        );
+
+    }
+);
+
+
+window.addEventListener(
+    "online",
+    clearError
+);
+
+
+// =====================================================
+// SMALL UTILITY
+// =====================================================
+
+function sleep(ms) {
+
+    return new Promise(
+        resolve => setTimeout(resolve, ms)
+    );
+
+}
+
+
+// =====================================================
+// PAGE / DASHBOARD STATE
+// =====================================================
+
+function showDashboard() {
+
+    if (dashboard) {
+        dashboard.classList.remove("hidden");
+    }
+
+
+    if (welcomeHero) {
+        welcomeHero.classList.add("hidden");
+    }
+
+}
+
+
+function hideDashboard() {
+
+    if (dashboard) {
+        dashboard.classList.add("hidden");
+    }
+
+
+    if (welcomeHero) {
+        welcomeHero.classList.remove("hidden");
+    }
+
+}
+
+
+// =====================================================
+// SPOTIFY BUTTON STATES
+// =====================================================
+
+function setSpotifyConnectedState() {
+
+    if (!loginBtn) {
+        return;
+    }
+
+
+    loginBtn.textContent =
+        "Log Out";
+
+
+    loginBtn.disabled =
+        false;
+
+
+    loginBtn.classList.add(
+        "logout-state"
+    );
+
+}
+
+
+function setSpotifyDisconnectedState() {
+
+    if (!loginBtn) {
+        return;
+    }
+
+
+    loginBtn.textContent =
+        "Connect Spotify";
+
+
+    loginBtn.disabled =
+        false;
+
+
+    loginBtn.classList.remove(
+        "logout-state"
+    );
+
+}
+
+
+// =====================================================
+// PKCE HELPERS
 // =====================================================
 
 function base64UrlEncode(bytes) {
@@ -418,6 +403,7 @@ async function pkceChallenge() {
 
     const verifierBytes =
         new Uint8Array(64);
+
 
     crypto.getRandomValues(
         verifierBytes
@@ -454,26 +440,19 @@ async function pkceChallenge() {
 
 
 // =====================================================
-// Spotify Login
+// START SPOTIFY LOGIN
 // =====================================================
 
 async function redirectToSpotifyLogin() {
 
-    const PLACEHOLDER_CLIENT_ID =
-        "PASTE_YOUR_SPOTIFY_CLIENT_ID_HERE";
-
-
-    if (
-        !SPOTIFY_CLIENT_ID ||
-        SPOTIFY_CLIENT_ID ===
-            PLACEHOLDER_CLIENT_ID
-    ) {
+    if (!SPOTIFY_CLIENT_ID) {
 
         showError(
-            "No Spotify Client ID is set. Add yours near the top of script.js before connecting."
+            "No Spotify Client ID is configured."
         );
 
         return;
+
     }
 
 
@@ -515,8 +494,15 @@ async function redirectToSpotifyLogin() {
             });
 
 
+        console.log(
+            "[GenPlaylist] Redirect URI:",
+            REDIRECT_URI
+        );
+
+
         window.location.href =
-            `https://accounts.spotify.com/authorize?${params.toString()}`;
+            "https://accounts.spotify.com/authorize?" +
+            params.toString();
 
 
     } catch (err) {
@@ -536,11 +522,12 @@ async function redirectToSpotifyLogin() {
         );
 
     }
+
 }
 
 
 // =====================================================
-// Exchange Spotify Authorization Code
+// EXCHANGE AUTHORIZATION CODE FOR TOKEN
 // =====================================================
 
 async function exchangeCodeForToken(code) {
@@ -581,29 +568,33 @@ async function exchangeCodeForToken(code) {
         });
 
 
-    let res;
+    let response;
 
 
     try {
 
-        res =
+        response =
             await fetch(
                 "https://accounts.spotify.com/api/token",
                 {
 
-                    method: "POST",
+                    method:
+                        "POST",
 
                     headers: {
+
                         "Content-Type":
                             "application/x-www-form-urlencoded"
+
                     },
 
-                    body
+                    body:
+                        body.toString()
 
                 }
             );
 
-    } catch (networkErr) {
+    } catch (error) {
 
         throw new Error(
             "NETWORK_ERROR"
@@ -612,19 +603,20 @@ async function exchangeCodeForToken(code) {
     }
 
 
-    if (!res.ok) {
+    if (!response.ok) {
 
         let detail = "";
 
 
         try {
 
-            const errJson =
-                await res.json();
+            const json =
+                await response.json();
+
 
             detail =
-                errJson.error_description ||
-                errJson.error ||
+                json.error_description ||
+                json.error ||
                 "";
 
         } catch (_) {
@@ -642,17 +634,32 @@ async function exchangeCodeForToken(code) {
 
 
     const json =
-        await res.json();
+        await response.json();
+
+
+    if (!json.access_token) {
+
+        throw new Error(
+            "TOKEN_EXCHANGE_FAILED"
+        );
+
+    }
 
 
     spotifyAccessToken =
         json.access_token;
 
+
+    // The verifier is no longer needed.
+    sessionStorage.removeItem(
+        "spotify_pkce_verifier"
+    );
+
 }
 
 
 // =====================================================
-// Spotify API Fetch Wrapper
+// SPOTIFY API FETCH
 // =====================================================
 
 async function spotifyFetch(
@@ -661,12 +668,21 @@ async function spotifyFetch(
     attempt = 1
 ) {
 
-    let res;
+    if (!spotifyAccessToken) {
+
+        throw new Error(
+            "AUTH_EXPIRED"
+        );
+
+    }
+
+
+    let response;
 
 
     try {
 
-        res =
+        response =
             await fetch(
                 `https://api.spotify.com/v1${path}`,
                 {
@@ -695,13 +711,14 @@ async function spotifyFetch(
             );
 
 
-    } catch (networkErr) {
+    } catch (error) {
 
         if (attempt <= 3) {
 
             await sleep(
                 500 * attempt
             );
+
 
             return spotifyFetch(
                 path,
@@ -719,15 +736,15 @@ async function spotifyFetch(
     }
 
 
-    // Rate limit
+    // Rate limiting
     if (
-        res.status === 429 &&
+        response.status === 429 &&
         attempt <= 4
     ) {
 
         const retryAfter =
             parseInt(
-                res.headers.get(
+                response.headers.get(
                     "Retry-After"
                 ) || "1",
                 10
@@ -735,7 +752,7 @@ async function spotifyFetch(
 
 
         await sleep(
-            (retryAfter || 1) * 1000
+            retryAfter * 1000
         );
 
 
@@ -748,9 +765,9 @@ async function spotifyFetch(
     }
 
 
-    // Server errors
+    // Spotify server errors
     if (
-        res.status >= 500 &&
+        response.status >= 500 &&
         attempt <= 3
     ) {
 
@@ -768,48 +785,54 @@ async function spotifyFetch(
     }
 
 
-    if (res.status === 401) {
+    if (response.status === 401) {
+
         throw new Error(
             "AUTH_EXPIRED"
         );
+
     }
 
 
-    if (res.status === 403) {
+    if (response.status === 403) {
+
         throw new Error(
             "FORBIDDEN"
         );
+
     }
 
 
-    if (res.status === 404) {
+    if (response.status === 404) {
+
         throw new Error(
             "NOT_FOUND"
         );
+
     }
 
 
-    if (!res.ok) {
+    if (!response.ok) {
 
         throw new Error(
-            `SPOTIFY_ERROR_${res.status}`
+            `SPOTIFY_ERROR_${response.status}`
         );
 
     }
 
 
-    if (res.status === 204) {
+    if (response.status === 204) {
         return null;
     }
 
 
-    return res.json();
+    return response.json();
 
 }
 
 
 // =====================================================
-// Spotify Pagination
+// SPOTIFY PAGINATION
 // =====================================================
 
 async function spotifyFetchAllPages(path) {
@@ -848,38 +871,61 @@ async function spotifyFetchAllPages(path) {
 
 
 // =====================================================
-// Friendly Spotify Errors
+// FRIENDLY SPOTIFY ERRORS
 // =====================================================
 
-function friendlyMessageFor(err) {
+function friendlyMessageFor(error) {
 
     switch (
-        err && err.message
+        error &&
+        error.message
     ) {
 
         case "NETWORK_ERROR":
 
-            return "Couldn't reach Spotify. Check your connection and try again.";
+            return (
+                "Couldn't reach Spotify. " +
+                "Check your connection and try again."
+            );
 
 
         case "AUTH_EXPIRED":
 
-            return "Your Spotify session expired. Please reconnect.";
+            return (
+                "Your Spotify session expired. " +
+                "Please reconnect."
+            );
 
 
         case "FORBIDDEN":
 
-            return "Spotify denied that request — a scope may be missing, or this endpoint isn't available for this app yet.";
+            return (
+                "Spotify denied that request. " +
+                "Please reconnect and make sure the required permissions are approved."
+            );
 
 
         case "NOT_FOUND":
 
-            return "Spotify couldn't find that resource.";
+            return (
+                "Spotify couldn't find that resource."
+            );
+
+
+        case "MISSING_VERIFIER":
+
+            return (
+                "The Spotify login session was lost. " +
+                "Please click Connect Spotify and try again."
+            );
 
 
         default:
 
-            return "Something went wrong talking to Spotify. Please try again.";
+            return (
+                "Something went wrong talking to Spotify. " +
+                "Please try again."
+            );
 
     }
 
@@ -887,86 +933,44 @@ function friendlyMessageFor(err) {
 
 
 // =====================================================
-// Spotify Connection Button States
+// SPOTIFY LOGOUT
 // =====================================================
-
-function setSpotifyConnectedState() {
-
-    loginBtn.innerText =
-        "Log Out";
-
-    loginBtn.disabled =
-        false;
-
-    loginBtn.classList.add(
-        "logout-state"
-    );
-
-}
-
-
-function setSpotifyDisconnectedState() {
-
-    loginBtn.innerText =
-        "Connect Spotify";
-
-    loginBtn.disabled =
-        false;
-
-    loginBtn.classList.remove(
-        "logout-state"
-    );
-
-}
-
-
-// =====================================================
-// Fake Spotify Logout
-// =====================================================
-// IMPORTANT:
-// This logs the user out of GenPlaylist.
-// It does NOT log the user out of the Spotify website/browser.
-//
-// This is intentional for the HCD prototype.
 
 function fakeSpotifyLogout() {
 
-    // Remove the Spotify access token
-    // from this page's JavaScript state.
-
+    // Clear access token.
     spotifyAccessToken = null;
 
 
-    // Remove the PKCE verifier.
-
+    // Clear PKCE data.
     sessionStorage.removeItem(
         "spotify_pkce_verifier"
     );
 
 
-    // Reset connection button.
-
+    // Reset button.
     setSpotifyDisconnectedState();
 
 
-    // Reset library section.
+    // Hide dashboard.
+    hideDashboard();
 
+
+    // Reset libraries.
     libraryList.innerHTML =
         `<p class="placeholder-text">
             Connect to Spotify to see your playlists here.
         </p>`;
 
 
-    // Reset top songs.
-
+    // Reset songs.
     songGrid.innerHTML =
         `<p class="placeholder-text">
             Connect to Spotify to see your top songs here.
         </p>`;
 
 
-    // Hide generated playlist.
-
+    // Hide generated content.
     loadingSection.classList.add(
         "hidden"
     );
@@ -976,31 +980,26 @@ function fakeSpotifyLogout() {
     );
 
 
-    // Clear playlist preview.
-
+    // Clear playlist.
     playlistPreview.innerHTML = "";
 
 
-    // Reset playlist name.
-
+    // Clear playlist name.
     const nameInput =
-        document.querySelector(
-            '.settings input[type="text"]'
+        document.getElementById(
+            "playlistName"
         );
 
 
     if (nameInput) {
-
         nameInput.value = "";
-
     }
 
 
     clearError();
 
 
-    // Return to top of page.
-
+    // Return to top.
     window.scrollTo({
 
         top: 0,
@@ -1013,33 +1012,61 @@ function fakeSpotifyLogout() {
 
 
 // =====================================================
-// Spotify Login Button
+// NAVIGATION LOGIN / LOGOUT BUTTON
 // =====================================================
 
-loginBtn.addEventListener(
-    "click",
-    () => {
+if (loginBtn) {
 
-        if (spotifyAccessToken) {
+    loginBtn.addEventListener(
+        "click",
+        () => {
 
-            fakeSpotifyLogout();
+            if (spotifyAccessToken) {
 
-            return;
+                fakeSpotifyLogout();
+
+            } else {
+
+                redirectToSpotifyLogin();
+
+            }
 
         }
+    );
 
-
-        redirectToSpotifyLogin();
-
-    }
-);
+}
 
 
 // =====================================================
-// Initialise Spotify Authentication
+// HERO CONNECT BUTTON
 // =====================================================
 
-(async function initSpotifyAuth() {
+if (startBtn) {
+
+    startBtn.addEventListener(
+        "click",
+        redirectToSpotifyLogin
+    );
+
+}
+
+
+// =====================================================
+// INITIALISE SPOTIFY AUTHENTICATION
+// =====================================================
+
+async function initSpotifyAuth() {
+
+    console.log(
+        "[GenPlaylist] Initialising Spotify authentication..."
+    );
+
+
+    console.log(
+        "[GenPlaylist] Redirect URI:",
+        REDIRECT_URI
+    );
+
 
     const params =
         new URLSearchParams(
@@ -1055,7 +1082,9 @@ loginBtn.addEventListener(
         params.get("error");
 
 
-    // User cancelled Spotify login.
+    // -----------------------------------------
+    // Spotify denied/cancelled login
+    // -----------------------------------------
 
     if (authError) {
 
@@ -1076,14 +1105,20 @@ loginBtn.addEventListener(
     }
 
 
-    // Normal page load.
+    // -----------------------------------------
+    // Normal page visit
+    // -----------------------------------------
 
     if (!code) {
+
         return;
+
     }
 
 
-    // Remove OAuth code from URL.
+    // -----------------------------------------
+    // Remove ?code= from browser URL
+    // -----------------------------------------
 
     window.history.replaceState(
         {},
@@ -1094,51 +1129,67 @@ loginBtn.addEventListener(
 
     try {
 
+        console.log(
+            "[GenPlaylist] Spotify authorization code received."
+        );
+
+
         await exchangeCodeForToken(
             code
         );
 
 
+        console.log(
+            "[GenPlaylist] Spotify access token received."
+        );
+
+
+        // -----------------------------------------
+        // THIS IS THE IMPORTANT PART
+        // -----------------------------------------
+
         setSpotifyConnectedState();
 
+        showDashboard();
 
         clearError();
 
 
+        // -----------------------------------------
+        // Load Spotify data
+        // -----------------------------------------
+
         await loadLibrariesAndAnchors();
 
 
-    } catch (err) {
+    } catch (error) {
 
         console.error(
             "[GenPlaylist auth error]",
-            err
+            error
         );
 
 
+        setSpotifyDisconnectedState();
+
+        hideDashboard();
+
+
         showError(
-
-            err.message ===
-                "NETWORK_ERROR"
-
-                ? friendlyMessageFor(err)
-
-                : "Spotify connection failed. Please reconnect and try again.",
-
+            friendlyMessageFor(error),
             {
                 retry:
                     redirectToSpotifyLogin
             }
-
         );
 
     }
 
-})();
+}
 
 
 // =====================================================
-// Load Spotify Libraries + Anchor Songs
+// LOAD SPOTIFY LIBRARIES + TOP SONGS
 // =====================================================
 
 async function loadLibrariesAndAnchors() {
@@ -1156,14 +1207,14 @@ async function loadLibrariesAndAnchors() {
 
 
     // -----------------------------------------
-    // Libraries
+    // Playlists + liked songs
     // -----------------------------------------
 
     try {
 
         const [
-            playlistsRes,
-            likedRes
+            playlistsResponse,
+            likedResponse
         ] = await Promise.all([
 
             spotifyFetch(
@@ -1178,15 +1229,21 @@ async function loadLibrariesAndAnchors() {
 
 
         renderLibraries(
-            playlistsRes.items || [],
-            likedRes.total || 0
+            playlistsResponse.items || [],
+            likedResponse.total || 0
         );
 
 
-    } catch (err) {
+    } catch (error) {
+
+        console.error(
+            "[GenPlaylist library error]",
+            error
+        );
+
 
         if (
-            err.message ===
+            error.message ===
             "AUTH_EXPIRED"
         ) {
 
@@ -1204,7 +1261,7 @@ async function loadLibrariesAndAnchors() {
 
 
         showError(
-            friendlyMessageFor(err),
+            friendlyMessageFor(error),
             {
                 retry:
                     loadLibrariesAndAnchors
@@ -1215,23 +1272,29 @@ async function loadLibrariesAndAnchors() {
 
 
     // -----------------------------------------
-    // Top Tracks
+    // Top tracks
     // -----------------------------------------
 
     try {
 
-        const topRes =
+        const topResponse =
             await spotifyFetch(
                 "/me/top/tracks?time_range=short_term&limit=8"
             );
 
 
         renderTopSongs(
-            topRes.items || []
+            topResponse.items || []
         );
 
 
-    } catch (err) {
+    } catch (error) {
+
+        console.error(
+            "[GenPlaylist top tracks error]",
+            error
+        );
+
 
         songGrid.innerHTML =
             `<p class="placeholder-text">
@@ -1244,7 +1307,7 @@ async function loadLibrariesAndAnchors() {
 
 
 // =====================================================
-// Render Libraries
+// RENDER LIBRARIES
 // =====================================================
 
 function renderLibraries(
@@ -1255,6 +1318,10 @@ function renderLibraries(
     libraryList.innerHTML = "";
 
 
+    // -----------------------------------------
+    // Liked Songs
+    // -----------------------------------------
+
     const likedLabel =
         document.createElement("label");
 
@@ -1264,13 +1331,16 @@ function renderLibraries(
 
 
     likedLabel.innerHTML =
-        `<input
+        `
+        <input
             type="checkbox"
             checked
             data-id="liked"
             data-count="${likedCount}"
         >
-        Liked Songs (${likedCount})`;
+
+        Liked Songs (${likedCount})
+        `;
 
 
     libraryList.appendChild(
@@ -1278,46 +1348,54 @@ function renderLibraries(
     );
 
 
-    playlists.forEach(p => {
+    // -----------------------------------------
+    // User playlists
+    // -----------------------------------------
 
-        const label =
-            document.createElement("label");
+    playlists.forEach(
+        playlist => {
 
-
-        label.className =
-            "library-item";
-
-
-        const trackCount =
-            (p.tracks &&
-                p.tracks.total) ??
-            (p.items &&
-                p.items.total) ??
-            "?";
+            const label =
+                document.createElement("label");
 
 
-        label.innerHTML =
-            `<input
-                type="checkbox"
-                checked
-                data-id="${escapeHtml(p.id)}"
-                data-count="${trackCount}"
-            >
-            ${escapeHtml(p.name)}
-            (${trackCount})`;
+            label.className =
+                "library-item";
 
 
-        libraryList.appendChild(
-            label
-        );
+            const trackCount =
+                playlist.tracks &&
+                typeof playlist.tracks.total === "number"
+                    ? playlist.tracks.total
+                    : "?";
 
-    });
+
+            label.innerHTML =
+                `
+                <input
+                    type="checkbox"
+                    checked
+                    data-id="${escapeHtml(playlist.id)}"
+                    data-count="${trackCount}"
+                >
+
+                ${escapeHtml(playlist.name)}
+                (${trackCount})
+                `;
+
+
+            libraryList.appendChild(
+                label
+            );
+
+        }
+    );
 
 }
 
 
 // =====================================================
-// Render Top Songs
+// RENDER TOP SONGS
 // =====================================================
 
 function renderTopSongs(tracks) {
@@ -1325,11 +1403,14 @@ function renderTopSongs(tracks) {
     songGrid.innerHTML = "";
 
 
-    if (!tracks || tracks.length === 0) {
+    if (
+        !tracks ||
+        tracks.length === 0
+    ) {
 
         songGrid.innerHTML =
             `<p class="placeholder-text">
-                No top songs yet — play some music on Spotify first, or skip anchors entirely.
+                No top songs yet — play some music on Spotify first.
             </p>`;
 
 
@@ -1338,62 +1419,72 @@ function renderTopSongs(tracks) {
     }
 
 
-    tracks.forEach(t => {
+    tracks.forEach(
+        track => {
 
-        const label =
-            document.createElement("label");
-
-
-        label.className =
-            "song-card";
+            const label =
+                document.createElement("label");
 
 
-        const image =
-            getSmallestImage(
-                t.album
-            ) || "";
+            label.className =
+                "song-card";
 
 
-        const artist =
-            (t.artists || [])
-                .map(a => a.name)
-                .join(", ");
+            const image =
+                getSmallestImage(
+                    track.album
+                ) || "";
 
 
-        label.innerHTML =
-            `<input
-                type="checkbox"
-                data-id="${escapeHtml(t.id)}"
-                data-uri="${escapeHtml(t.uri || "")}"
-                data-title="${escapeHtml(t.name)}"
-                data-artist="${escapeHtml(artist)}"
-                data-image="${escapeHtml(image)}"
-            >
-            ${escapeHtml(t.name)}
-            — ${escapeHtml(artist)}`;
+            const artist =
+                (track.artists || [])
+                    .map(
+                        artist =>
+                            artist.name
+                    )
+                    .join(", ");
 
 
-        songGrid.appendChild(
-            label
-        );
+            label.innerHTML =
+                `
+                <input
+                    type="checkbox"
+                    data-id="${escapeHtml(track.id)}"
+                    data-uri="${escapeHtml(track.uri || "")}"
+                    data-title="${escapeHtml(track.name)}"
+                    data-artist="${escapeHtml(artist)}"
+                    data-image="${escapeHtml(image)}"
+                >
 
-    });
+                ${escapeHtml(track.name)}
+                — ${escapeHtml(artist)}
+                `;
+
+
+            songGrid.appendChild(
+                label
+            );
+
+        }
+    );
 
 }
 
 
 // =====================================================
-// HTML Escaping
+// HTML ESCAPING
 // =====================================================
 
-function escapeHtml(str) {
+function escapeHtml(value) {
 
     const div =
         document.createElement("div");
 
 
     div.textContent =
-        str || "";
+        value == null
+            ? ""
+            : String(value);
 
 
     return div.innerHTML;
@@ -1402,7 +1493,31 @@ function escapeHtml(str) {
 
 
 // =====================================================
-// Handle Expired Spotify Authentication
+// ALBUM ART HELPER
+// =====================================================
+
+function getSmallestImage(album) {
+
+    if (
+        !album ||
+        !album.images ||
+        album.images.length === 0
+    ) {
+
+        return null;
+
+    }
+
+
+    return album.images[
+        album.images.length - 1
+    ].url;
+
+}
+
+
+// =====================================================
+// AUTH EXPIRED
 // =====================================================
 
 function handleAuthExpired() {
@@ -1418,6 +1533,9 @@ function handleAuthExpired() {
     setSpotifyDisconnectedState();
 
 
+    hideDashboard();
+
+
     libraryList.innerHTML =
         `<p class="placeholder-text">
             Connect to Spotify to see your playlists here.
@@ -1431,35 +1549,109 @@ function handleAuthExpired() {
 
 
     showError(
-
         "Your Spotify session expired. Please reconnect.",
-
         {
             retry:
                 redirectToSpotifyLogin
         }
-
     );
 
 }
 
 
 // =====================================================
-// Application State
+// SELECT / DESELECT PLAYLISTS
 // =====================================================
 
-let selectedIntent =
-    "Current Favourites";
+if (selectAllPlaylists) {
+
+    selectAllPlaylists.addEventListener(
+        "click",
+        () => {
+
+            libraryList
+                .querySelectorAll(
+                    'input[type="checkbox"]'
+                )
+                .forEach(
+                    checkbox => {
+                        checkbox.checked = true;
+                    }
+                );
+
+        }
+    );
+
+}
+
+
+if (deselectAllPlaylists) {
+
+    deselectAllPlaylists.addEventListener(
+        "click",
+        () => {
+
+            libraryList
+                .querySelectorAll(
+                    'input[type="checkbox"]'
+                )
+                .forEach(
+                    checkbox => {
+                        checkbox.checked = false;
+                    }
+                );
+
+        }
+    );
+
+}
 
 
 // =====================================================
-// Hero Button
+// PLAYLIST SIZE MODE
 // =====================================================
 
-startBtn.addEventListener("click", redirectToSpotifyLogin);
+if (sizeMode) {
+
+    sizeMode.addEventListener(
+        "change",
+        updatePlaylistSizeMode
+    );
+
+}
+
+
+function updatePlaylistSizeMode() {
+
+    if (
+        sizeMode.value === "duration"
+    ) {
+
+        songCountSetting.classList.add(
+            "hidden"
+        );
+
+        durationSetting.classList.remove(
+            "hidden"
+        );
+
+    } else {
+
+        songCountSetting.classList.remove(
+            "hidden"
+        );
+
+        durationSetting.classList.add(
+            "hidden"
+        );
+
+    }
+
+}
+
 
 // =====================================================
-// Intent Selection
+// INTENTION SELECTION
 // =====================================================
 
 intentionButtons.forEach(
@@ -1470,10 +1662,13 @@ intentionButtons.forEach(
             () => {
 
                 intentionButtons.forEach(
-                    btn =>
-                        btn.classList.remove(
+                    otherButton => {
+
+                        otherButton.classList.remove(
                             "selected"
-                        )
+                        );
+
+                    }
                 );
 
 
@@ -1483,7 +1678,7 @@ intentionButtons.forEach(
 
 
                 selectedIntent =
-                    button.innerText.trim();
+                    button.textContent.trim();
 
             }
         );
@@ -1493,14 +1688,58 @@ intentionButtons.forEach(
 
 
 // =====================================================
-// Generate Playlist
+// GET TARGET PLAYLIST SIZE
 // =====================================================
 
-generateBtn.addEventListener(
-    "click",
-    generatePlaylist
-);
+function getTargetPlaylistSize() {
 
+    if (
+        sizeMode.value === "duration"
+    ) {
+
+        const minutes =
+            parseInt(
+                playlistDuration.value,
+                10
+            ) || 45;
+
+
+        // Approximate 4 minutes per song.
+        return Math.max(
+            1,
+            Math.round(minutes / 4)
+        );
+
+    }
+
+
+    return (
+        parseInt(
+            songCount.value,
+            10
+        ) || 50
+    );
+
+}
+
+
+// =====================================================
+// GENERATE BUTTON
+// =====================================================
+
+if (generateBtn) {
+
+    generateBtn.addEventListener(
+        "click",
+        generatePlaylist
+    );
+
+}
+
+
+// =====================================================
+// GENERATE PLAYLIST
+// =====================================================
 
 async function generatePlaylist() {
 
@@ -1520,15 +1759,17 @@ async function generatePlaylist() {
             libraryList.querySelectorAll(
                 'input[type="checkbox"]:checked'
             )
-        ).map(cb => ({
+        ).map(
+            checkbox => ({
 
-            id:
-                cb.dataset.id,
+                id:
+                    checkbox.dataset.id,
 
-            isLiked:
-                cb.dataset.id === "liked"
+                isLiked:
+                    checkbox.dataset.id === "liked"
 
-        }));
+            })
+        );
 
 
     if (
@@ -1549,37 +1790,30 @@ async function generatePlaylist() {
             songGrid.querySelectorAll(
                 'input[type="checkbox"]:checked'
             )
-        ).map(cb => ({
+        ).map(
+            checkbox => ({
 
-            id:
-                cb.dataset.id,
+                id:
+                    checkbox.dataset.id,
 
-            uri:
-                cb.dataset.uri,
+                uri:
+                    checkbox.dataset.uri,
 
-            title:
-                cb.dataset.title,
+                title:
+                    checkbox.dataset.title,
 
-            artist:
-                cb.dataset.artist,
+                artist:
+                    checkbox.dataset.artist,
 
-            image:
-                cb.dataset.image || null
+                image:
+                    checkbox.dataset.image || null
 
-        }));
-
-
-    const sizeSelect =
-        document.querySelector(
-            ".settings select"
+            })
         );
 
 
     const targetSize =
-        parseInt(
-            sizeSelect.value,
-            10
-        ) || 50;
+        getTargetPlaylistSize();
 
 
     loadingSection.classList.remove(
@@ -1595,7 +1829,7 @@ async function generatePlaylist() {
     window.scrollTo({
 
         top:
-            loadingSection.offsetTop,
+            loadingSection.offsetTop - 80,
 
         behavior:
             "smooth"
@@ -1611,7 +1845,9 @@ async function generatePlaylist() {
             );
 
 
-        if (pool.length === 0) {
+        if (
+            pool.length === 0
+        ) {
 
             throw new Error(
                 "EMPTY_POOL"
@@ -1633,7 +1869,7 @@ async function generatePlaylist() {
             );
 
 
-        const result =
+        const playlist =
             assemblePlaylist(
                 scored,
                 anchorTracks,
@@ -1643,7 +1879,7 @@ async function generatePlaylist() {
 
 
         renderPlaylist(
-            result
+            playlist
         );
 
 
@@ -1665,7 +1901,13 @@ async function generatePlaylist() {
         clearError();
 
 
-    } catch (err) {
+    } catch (error) {
+
+        console.error(
+            "[GenPlaylist generation error]",
+            error
+        );
+
 
         loadingSection.classList.add(
             "hidden"
@@ -1673,7 +1915,7 @@ async function generatePlaylist() {
 
 
         if (
-            err.message ===
+            error.message ===
             "AUTH_EXPIRED"
         ) {
 
@@ -1685,7 +1927,7 @@ async function generatePlaylist() {
 
 
         if (
-            err.message ===
+            error.message ===
             "EMPTY_POOL"
         ) {
 
@@ -1699,7 +1941,7 @@ async function generatePlaylist() {
 
 
         showError(
-            friendlyMessageFor(err),
+            friendlyMessageFor(error),
             {
                 retry:
                     generatePlaylist
@@ -1712,7 +1954,7 @@ async function generatePlaylist() {
 
 
 // =====================================================
-// Build Eligible Track Pool
+// BUILD TRACK POOL
 // =====================================================
 
 async function buildTrackPool(
@@ -1723,18 +1965,24 @@ async function buildTrackPool(
         await Promise.allSettled(
 
             selectedLibraries.map(
-                source =>
+                source => {
 
-                    source.isLiked
+                    if (
+                        source.isLiked
+                    ) {
 
-                        ? spotifyFetchAllPages(
+                        return spotifyFetchAllPages(
                             "/me/tracks?limit=50"
-                        )
+                        );
 
-                        : spotifyFetchAllPages(
-                            `/playlists/${source.id}/items?limit=100`
-                        )
+                    }
 
+
+                    return spotifyFetchAllPages(
+                        `/playlists/${source.id}/items?limit=100`
+                    );
+
+                }
             )
 
         );
@@ -1744,49 +1992,60 @@ async function buildTrackPool(
         new Map();
 
 
-    results.forEach(r => {
-
-        if (
-            r.status !== "fulfilled"
-        ) {
-            return;
-        }
-
-
-        r.value.forEach(entry => {
-
-            const track =
-                entry.item ||
-                entry.track;
-
+    results.forEach(
+        result => {
 
             if (
-                !track ||
-                !track.id
+                result.status !==
+                "fulfilled"
             ) {
+
                 return;
+
             }
 
 
-            if (
-                !byId.has(track.id)
-            ) {
+            result.value.forEach(
+                entry => {
 
-                byId.set(
-                    track.id,
-                    {
-                        ...track,
-                        added_at:
-                            entry.added_at ||
-                            null
+                    const track =
+                        entry.item ||
+                        entry.track;
+
+
+                    if (
+                        !track ||
+                        !track.id
+                    ) {
+
+                        return;
+
                     }
-                );
 
-            }
 
-        });
+                    if (
+                        !byId.has(track.id)
+                    ) {
 
-    });
+                        byId.set(
+                            track.id,
+                            {
+                                ...track,
+
+                                added_at:
+                                    entry.added_at ||
+                                    null
+
+                            }
+                        );
+
+                    }
+
+                }
+            );
+
+        }
+    );
 
 
     return Array.from(
@@ -1797,7 +2056,7 @@ async function buildTrackPool(
 
 
 // =====================================================
-// Listening Signals
+// LISTENING SIGNALS
 // =====================================================
 
 async function fetchSignalsWithFallback(
@@ -1827,61 +2086,78 @@ async function fetchSignalsWithFallback(
 
 
     const [
-        shortRes,
-        medRes,
-        longRes,
-        recentRes
+        shortResult,
+        mediumResult,
+        longResult,
+        recentResult
     ] = results;
 
 
     const shortIds =
         new Set(
-            shortRes.status === "fulfilled"
-                ? (shortRes.value.items || [])
-                    .map(t => t.id)
+            shortResult.status === "fulfilled"
+                ? (
+                    shortResult.value.items ||
+                    []
+                ).map(
+                    track => track.id
+                )
                 : []
         );
 
 
-    const medIds =
+    const mediumIds =
         new Set(
-            medRes.status === "fulfilled"
-                ? (medRes.value.items || [])
-                    .map(t => t.id)
+            mediumResult.status === "fulfilled"
+                ? (
+                    mediumResult.value.items ||
+                    []
+                ).map(
+                    track => track.id
+                )
                 : []
         );
 
 
     const longIds =
         new Set(
-            longRes.status === "fulfilled"
-                ? (longRes.value.items || [])
-                    .map(t => t.id)
+            longResult.status === "fulfilled"
+                ? (
+                    longResult.value.items ||
+                    []
+                ).map(
+                    track => track.id
+                )
                 : []
         );
 
 
     const recentIds =
         new Set(
-            recentRes.status === "fulfilled"
-                ? (recentRes.value.items || [])
-                    .map(i =>
-                        i.track &&
-                        i.track.id
+            recentResult.status === "fulfilled"
+                ? (
+                    recentResult.value.items ||
+                    []
+                )
+                    .map(
+                        item =>
+                            item.track &&
+                            item.track.id
                     )
                     .filter(Boolean)
                 : []
         );
 
 
-    const anyRealSignal =
+    const hasRealSignals =
         shortIds.size +
-        medIds.size +
+        mediumIds.size +
         longIds.size +
-        recentIds.size > 0;
+        recentIds.size >
+        0;
 
 
-    if (anyRealSignal) {
+    if (hasRealSignals) {
 
         return {
 
@@ -1889,8 +2165,11 @@ async function fetchSignalsWithFallback(
                 "api",
 
             shortIds,
-            medIds,
+
+            mediumIds,
+
             longIds,
+
             recentIds
 
         };
@@ -1899,23 +2178,28 @@ async function fetchSignalsWithFallback(
 
 
     // -----------------------------------------
-    // Fallback: added_at
+    // Fallback: playlist added dates
     // -----------------------------------------
 
     const withDates =
         pool
-            .filter(t => t.added_at)
-            .map(t => ({
+            .filter(
+                track =>
+                    track.added_at
+            )
+            .map(
+                track => ({
 
-                id:
-                    t.id,
+                    id:
+                        track.id,
 
-                addedAt:
-                    new Date(
-                        t.added_at
-                    ).getTime()
+                    addedAt:
+                        new Date(
+                            track.added_at
+                        ).getTime()
 
-            }));
+                })
+            );
 
 
     if (
@@ -1931,16 +2215,21 @@ async function fetchSignalsWithFallback(
 
     const times =
         withDates.map(
-            t => t.addedAt
+            item =>
+                item.addedAt
         );
 
 
     const newest =
-        Math.max(...times);
+        Math.max(
+            ...times
+        );
 
 
     const oldest =
-        Math.min(...times);
+        Math.min(
+            ...times
+        );
 
 
     return {
@@ -1960,31 +2249,7 @@ async function fetchSignalsWithFallback(
 
 
 // =====================================================
-// Album Artwork Helper
-// =====================================================
-
-function getSmallestImage(album) {
-
-    if (
-        !album ||
-        !album.images ||
-        album.images.length === 0
-    ) {
-
-        return null;
-
-    }
-
-
-    return album.images[
-        album.images.length - 1
-    ].url;
-
-}
-
-
-// =====================================================
-// Score Track Pool
+// SCORE TRACK POOL
 // =====================================================
 
 function scorePool(
@@ -1992,127 +2257,141 @@ function scorePool(
     signals
 ) {
 
-    return pool.map(t => {
+    return pool.map(
+        track => {
 
-        let recency = 0;
-        let dormancy = 0;
+            let recency = 0;
 
-
-        if (
-            signals.mode === "api"
-        ) {
-
-            const isRecent =
-                signals.shortIds.has(t.id) ||
-                signals.recentIds.has(t.id);
+            let dormancy = 0;
 
 
-            const wasFavorite =
-                signals.longIds.has(t.id) ||
-                signals.medIds.has(t.id);
+            if (
+                signals.mode === "api"
+            ) {
+
+                const isRecent =
+                    signals.shortIds.has(
+                        track.id
+                    ) ||
+                    signals.recentIds.has(
+                        track.id
+                    );
 
 
-            recency =
-                isRecent
-                    ? 1
-                    : 0;
+                const wasFavourite =
+                    signals.longIds.has(
+                        track.id
+                    ) ||
+                    signals.mediumIds.has(
+                        track.id
+                    );
 
 
-            dormancy =
-                wasFavorite && !isRecent
-                    ? 1
-                    : 0;
-
-        }
+                recency =
+                    isRecent
+                        ? 1
+                        : 0;
 
 
-        else if (
-            signals.mode ===
-            "added_at" &&
-            t.added_at
-        ) {
+                dormancy =
+                    wasFavourite &&
+                    !isRecent
+                        ? 1
+                        : 0;
 
-            const addedAt =
-                new Date(
-                    t.added_at
-                ).getTime();
+            }
 
 
-            const span =
-                signals.newest -
-                signals.oldest ||
-                1;
+            else if (
+                signals.mode === "added_at" &&
+                track.added_at
+            ) {
+
+                const addedAt =
+                    new Date(
+                        track.added_at
+                    ).getTime();
 
 
-            recency =
-                (addedAt -
-                    signals.oldest) /
-                span;
+                const span =
+                    signals.newest -
+                    signals.oldest ||
+                    1;
 
 
-            dormancy =
-                1 - recency;
+                recency =
+                    (
+                        addedAt -
+                        signals.oldest
+                    ) / span;
 
-        }
+
+                dormancy =
+                    1 - recency;
+
+            }
 
 
-        const baseline =
-            (
+            const baseline =
                 recency === 0 &&
                 dormancy === 0
-            )
-                ? 0.15
-                : 0;
+                    ? 0.15
+                    : 0;
 
 
-        return {
+            return {
 
-            id:
-                t.id,
+                id:
+                    track.id,
 
-            title:
-                t.name,
+                title:
+                    track.name,
 
-            artist:
-                (t.artists || [])
-                    .map(a => a.name)
-                    .join(", "),
+                artist:
+                    (track.artists || [])
+                        .map(
+                            artist =>
+                                artist.name
+                        )
+                        .join(", "),
 
-            image:
-                getSmallestImage(
-                    t.album
-                ),
+                image:
+                    getSmallestImage(
+                        track.album
+                    ),
 
-            url:
-                t.external_urls
-                    ? t.external_urls.spotify
-                    : `https://open.spotify.com/track/${t.id}`,
+                url:
+                    track.external_urls &&
+                    track.external_urls.spotify
+                        ? track.external_urls.spotify
+                        : `https://open.spotify.com/track/${track.id}`,
 
-            uri:
-                t.uri,
+                uri:
+                    track.uri,
 
-            recency,
+                recency,
 
-            dormancy,
+                dormancy,
 
-            baseline,
+                baseline,
 
-            tag:
-                dormancy > 0.5
-                    ? "worth revisiting"
-                    : recency > 0.5
-                        ? "in rotation"
-                        : ""
+                tag:
+                    dormancy > 0.5
+                        ? "worth revisiting"
+                        : recency > 0.5
+                            ? "in rotation"
+                            : ""
 
-        };
+            };
 
-    });
+        }
+    );
 
 }
 
 
 // =====================================================
-// Intent Weighting
+// INTENT WEIGHTING
 // =====================================================
 
 function weightForIntent(
@@ -2171,7 +2450,7 @@ function weightForIntent(
 
 
 // =====================================================
-// Assemble Playlist
+// ASSEMBLE PLAYLIST
 // =====================================================
 
 function assemblePlaylist(
@@ -2184,58 +2463,65 @@ function assemblePlaylist(
     const anchorIds =
         new Set(
             anchorTracks.map(
-                a => a.id
+                anchor =>
+                    anchor.id
             )
         );
 
 
     const anchors =
         scored.filter(
-            t => anchorIds.has(t.id)
+            track =>
+                anchorIds.has(
+                    track.id
+                )
         );
 
 
     const missingAnchors =
         anchorTracks
-
             .filter(
-                a =>
+                anchor =>
                     !scored.some(
-                        t =>
-                            t.id === a.id
+                        track =>
+                            track.id ===
+                            anchor.id
                     )
             )
+            .map(
+                anchor => ({
 
-            .map(a => ({
+                    id:
+                        anchor.id,
 
-                id:
-                    a.id,
+                    title:
+                        anchor.title,
 
-                title:
-                    a.title,
+                    artist:
+                        anchor.artist,
 
-                artist:
-                    a.artist,
+                    image:
+                        anchor.image,
 
-                image:
-                    a.image,
+                    url:
+                        `https://open.spotify.com/track/${anchor.id}`,
 
-                url:
-                    `https://open.spotify.com/track/${a.id}`,
+                    uri:
+                        anchor.uri,
 
-                uri:
-                    a.uri,
+                    tag:
+                        "anchor"
 
-                tag:
-                    "anchor"
-
-            }));
+                })
+            );
 
 
     const remainingPool =
         scored.filter(
-            t =>
-                !anchorIds.has(t.id)
+            track =>
+                !anchorIds.has(
+                    track.id
+                )
         );
 
 
@@ -2250,12 +2536,11 @@ function assemblePlaylist(
 
     const rest =
         weightedSampleWithoutReplacement(
-
             remainingPool,
 
-            t =>
+            track =>
                 weightForIntent(
-                    t,
+                    track,
                     intent
                 ),
 
@@ -2263,7 +2548,6 @@ function assemblePlaylist(
                 remainingSlots,
                 remainingPool.length
             )
-
         );
 
 
@@ -2281,7 +2565,7 @@ function assemblePlaylist(
 
 
 // =====================================================
-// Weighted Sampling
+// WEIGHTED SAMPLING
 // =====================================================
 
 function weightedSampleWithoutReplacement(
@@ -2291,21 +2575,22 @@ function weightedSampleWithoutReplacement(
 ) {
 
     const pool =
-        items.map(t => ({
+        items.map(
+            track => ({
 
-            t,
+                track,
 
-            w:
-                Math.max(
-                    weightFn(t),
-                    0.001
-                )
+                weight:
+                    Math.max(
+                        weightFn(track),
+                        0.001
+                    )
 
-        }));
+            })
+        );
 
 
     const chosen = [];
-
 
     const artistCounts =
         new Map();
@@ -2321,18 +2606,18 @@ function weightedSampleWithoutReplacement(
 
         const totalWeight =
             pool.reduce(
-                (sum, x) =>
-                    sum + x.w,
+                (sum, item) =>
+                    sum + item.weight,
                 0
             );
 
 
-        let r =
+        let random =
             Math.random() *
             totalWeight;
 
 
-        let idx =
+        let selectedIndex =
             pool.length - 1;
 
 
@@ -2342,12 +2627,15 @@ function weightedSampleWithoutReplacement(
             i++
         ) {
 
-            r -= pool[i].w;
+            random -=
+                pool[i].weight;
 
 
-            if (r <= 0) {
+            if (
+                random <= 0
+            ) {
 
-                idx = i;
+                selectedIndex = i;
 
                 break;
 
@@ -2357,23 +2645,24 @@ function weightedSampleWithoutReplacement(
 
 
         const candidate =
-            pool[idx].t;
+            pool[selectedIndex].track;
 
 
-        const count_ =
+        const currentArtistCount =
             artistCounts.get(
                 candidate.artist
             ) || 0;
 
 
         pool.splice(
-            idx,
+            selectedIndex,
             1
         );
 
 
         if (
-            count_ >= ARTIST_CAP
+            currentArtistCount >=
+            ARTIST_CAP
         ) {
 
             continue;
@@ -2388,7 +2677,7 @@ function weightedSampleWithoutReplacement(
 
         artistCounts.set(
             candidate.artist,
-            count_ + 1
+            currentArtistCount + 1
         );
 
     }
@@ -2400,97 +2689,7 @@ function weightedSampleWithoutReplacement(
 
 
 // =====================================================
-// Render Playlist
-// =====================================================
-
-function renderPlaylist(
-    tracks
-) {
-
-    playlistPreview.innerHTML =
-        "";
-
-
-    tracks.forEach(
-        track => {
-
-            playlistPreview.appendChild(
-                createTrack(track)
-            );
-
-        }
-    );
-
-}
-
-
-// =====================================================
-// Create Track Element
-// =====================================================
-
-function createTrack(
-    track
-) {
-
-    const container =
-        document.createElement(
-            "div"
-        );
-
-
-    container.className =
-        "track";
-
-
-    container.dataset.uri =
-        track.uri || "";
-
-
-    const albumArt =
-        track.image
-            ? `<img
-                    class="album-art"
-                    src="${escapeHtml(track.image)}"
-                    alt=""
-                    loading="lazy"
-                    onerror="this.outerHTML='<div class=&quot;album-art&quot;></div>'"
-               >`
-            : `<div class="album-art"></div>`;
-
-
-    container.innerHTML = `
-
-        ${albumArt}
-
-        <div>
-
-            <h4>
-                ${escapeHtml(track.title)}
-            </h4>
-
-            <span>
-                ${escapeHtml(track.artist)}
-            </span>
-
-            <small>
-                ${escapeHtml(
-                    track.tag ||
-                    selectedIntent
-                )}
-            </small>
-
-        </div>
-
-    `;
-
-
-    return container;
-
-}
-
-
-// =====================================================
-// Shuffle Helper
+// SHUFFLE
 // =====================================================
 
 function shuffle(array) {
@@ -2525,33 +2724,330 @@ function shuffle(array) {
 
 
 // =====================================================
-// Save Generated Playlist to Spotify
+// RENDER PLAYLIST
 // =====================================================
 
-async function savePlaylistToSpotify() {
+function renderPlaylist(tracks) {
 
-    const spotifyButton =
-        Array.from(
-            document.querySelectorAll(
-                ".spotify-btn"
-            )
-        ).find(
-            button =>
-                button.innerText.trim() ===
-                "Save to Spotify"
+    playlistPreview.innerHTML = "";
+
+
+    tracks.forEach(
+        track => {
+
+            playlistPreview.appendChild(
+                createTrack(track)
+            );
+
+        }
+    );
+
+}
+
+
+// =====================================================
+// CREATE TRACK ELEMENT
+// =====================================================
+
+function createTrack(track) {
+
+    const container =
+        document.createElement("div");
+
+
+    container.className =
+        "track";
+
+
+    container.dataset.uri =
+        track.uri || "";
+
+
+    const albumArt =
+        track.image
+            ? `
+                <img
+                    class="album-art"
+                    src="${escapeHtml(track.image)}"
+                    alt=""
+                    loading="lazy"
+                >
+              `
+            : `
+                <div class="album-art"></div>
+              `;
+
+
+    container.innerHTML = `
+
+        ${albumArt}
+
+        <div>
+
+            <h4>
+                ${escapeHtml(track.title)}
+            </h4>
+
+            <span>
+                ${escapeHtml(track.artist)}
+            </span>
+
+            <small>
+                ${escapeHtml(
+                    track.tag ||
+                    selectedIntent
+                )}
+            </small>
+
+        </div>
+
+    `;
+
+
+    const image =
+        container.querySelector(
+            "img"
         );
 
 
-    if (!spotifyButton) {
+    if (image) {
 
-        showError(
-            "Couldn't find the Spotify save button."
+        image.addEventListener(
+            "error",
+            () => {
+
+                const fallback =
+                    document.createElement(
+                        "div"
+                    );
+
+
+                fallback.className =
+                    "album-art";
+
+
+                image.replaceWith(
+                    fallback
+                );
+
+            }
         );
-
-        return;
 
     }
 
+
+    return container;
+
+}
+
+
+// =====================================================
+// SUPABASE CLIENT
+// =====================================================
+
+function getSupabaseClient() {
+
+    if (supabaseClient) {
+        return supabaseClient;
+    }
+
+
+    if (
+        !window.supabase ||
+        typeof window.supabase.createClient !==
+        "function"
+    ) {
+
+        throw new Error(
+            "SUPABASE_LIBRARY_MISSING"
+        );
+
+    }
+
+
+    supabaseClient =
+        window.supabase.createClient(
+            SUPABASE_URL,
+            SUPABASE_ANON_KEY
+        );
+
+
+    return supabaseClient;
+
+}
+
+
+// =====================================================
+// SAVE PLAYLIST TO SUPABASE
+// =====================================================
+
+async function savePlaylistToDatabase(
+    tracks,
+    intent
+) {
+
+    if (!saveDbBtn) {
+        return;
+    }
+
+
+    saveDbBtn.disabled =
+        true;
+
+
+    saveDbBtn.textContent =
+        "Saving…";
+
+
+    try {
+
+        const client =
+            getSupabaseClient();
+
+
+        const nameInput =
+            document.getElementById(
+                "playlistName"
+            );
+
+
+        const playlistName =
+            nameInput &&
+            nameInput.value.trim()
+                ? nameInput.value.trim()
+                : null;
+
+
+        const {
+            error
+        } =
+            await client
+                .from("generated_playlists")
+                .insert({
+
+                    playlist_name:
+                        playlistName,
+
+                    intent:
+                        intent,
+
+                    track_count:
+                        tracks.length,
+
+                    tracks:
+                        tracks
+
+                });
+
+
+        if (error) {
+            throw error;
+        }
+
+
+        saveDbBtn.textContent =
+            "Saved ✓";
+
+
+        clearError();
+
+
+    } catch (error) {
+
+        console.error(
+            "[GenPlaylist Supabase error]",
+            error
+        );
+
+
+        saveDbBtn.disabled =
+            false;
+
+
+        saveDbBtn.textContent =
+            "Save Playlist";
+
+
+        showError(
+            "Couldn't save your playlist. Please try again.",
+            {
+                retry:
+                    () =>
+                        savePlaylistToDatabase(
+                            tracks,
+                            intent
+                        )
+            }
+        );
+
+    }
+
+}
+
+
+// =====================================================
+// SAVE DATABASE BUTTON
+// =====================================================
+
+if (saveDbBtn) {
+
+    saveDbBtn.addEventListener(
+        "click",
+        () => {
+
+            const tracks =
+                Array.from(
+                    playlistPreview.querySelectorAll(
+                        ".track"
+                    )
+                ).map(
+                    element => ({
+
+                        title:
+                            element.querySelector(
+                                "h4"
+                            )?.textContent ||
+                            "",
+
+                        artist:
+                            element.querySelector(
+                                "span"
+                            )?.textContent ||
+                            ""
+
+                    })
+                );
+
+
+            if (
+                tracks.length === 0
+            ) {
+
+                showError(
+                    "Generate a playlist first before saving."
+                );
+
+                return;
+
+            }
+
+
+            savePlaylistToDatabase(
+                tracks,
+                selectedIntent
+            );
+
+        }
+    );
+
+}
+
+
+// =====================================================
+// SAVE GENERATED PLAYLIST TO SPOTIFY
+// =====================================================
+
+async function savePlaylistToSpotify() {
 
     if (!spotifyAccessToken) {
 
@@ -2587,12 +3083,10 @@ async function savePlaylistToSpotify() {
 
     const trackUris =
         tracks
-
             .map(
                 track =>
                     track.dataset.uri
             )
-
             .filter(
                 uri =>
                     uri &&
@@ -2616,8 +3110,8 @@ async function savePlaylistToSpotify() {
 
 
     const nameInput =
-        document.querySelector(
-            '.settings input[type="text"]'
+        document.getElementById(
+            "playlistName"
         );
 
 
@@ -2628,18 +3122,21 @@ async function savePlaylistToSpotify() {
             : "GenPlaylist Mix";
 
 
-    spotifyButton.disabled =
-        true;
+    if (saveSpotifyBtn) {
 
+        saveSpotifyBtn.disabled =
+            true;
 
-    spotifyButton.textContent =
-        "Saving…";
+        saveSpotifyBtn.textContent =
+            "Saving…";
+
+    }
 
 
     try {
 
         // -----------------------------------------
-        // Step 1: Get current Spotify user
+        // Get current Spotify user
         // -----------------------------------------
 
         const currentUser =
@@ -2649,7 +3146,7 @@ async function savePlaylistToSpotify() {
 
 
         // -----------------------------------------
-        // Step 2: Create playlist
+        // Create playlist
         // -----------------------------------------
 
         const createdPlaylist =
@@ -2660,7 +3157,7 @@ async function savePlaylistToSpotify() {
 
 
         // -----------------------------------------
-        // Step 3: Add tracks
+        // Add tracks
         // -----------------------------------------
 
         await addTracksToSpotifyPlaylist(
@@ -2669,17 +3166,18 @@ async function savePlaylistToSpotify() {
         );
 
 
-        spotifyButton.textContent =
-            "Saved to Spotify ✓";
+        if (saveSpotifyBtn) {
+
+            saveSpotifyBtn.textContent =
+                "Saved to Spotify ✓";
+
+        }
 
 
         clearError();
 
 
-        // -----------------------------------------
-        // Open new playlist
-        // -----------------------------------------
-
+        // Open playlist
         if (
             createdPlaylist.external_urls &&
             createdPlaylist.external_urls.spotify
@@ -2694,24 +3192,27 @@ async function savePlaylistToSpotify() {
         }
 
 
-    } catch (err) {
+    } catch (error) {
 
         console.error(
             "[GenPlaylist Spotify save error]",
-            err
+            error
         );
 
 
-        spotifyButton.disabled =
-            false;
+        if (saveSpotifyBtn) {
 
+            saveSpotifyBtn.disabled =
+                false;
 
-        spotifyButton.textContent =
-            "Save to Spotify";
+            saveSpotifyBtn.textContent =
+                "Save to Spotify";
+
+        }
 
 
         if (
-            err.message ===
+            error.message ===
             "AUTH_EXPIRED"
         ) {
 
@@ -2723,7 +3224,7 @@ async function savePlaylistToSpotify() {
 
 
         if (
-            err.message ===
+            error.message ===
             "FORBIDDEN"
         ) {
 
@@ -2750,7 +3251,7 @@ async function savePlaylistToSpotify() {
 
 
 // =====================================================
-// Create Spotify Playlist
+// CREATE SPOTIFY PLAYLIST
 // =====================================================
 
 async function createSpotifyPlaylist(
@@ -2775,10 +3276,6 @@ async function createSpotifyPlaylist(
     };
 
 
-    // Spotify creates the playlist for the
-    // authenticated user, so userId isn't
-    // required for this request.
-
     return spotifyFetch(
         "/me/playlists",
         {
@@ -2796,7 +3293,7 @@ async function createSpotifyPlaylist(
 
 
 // =====================================================
-// Add Tracks to Spotify Playlist
+// ADD TRACKS TO SPOTIFY PLAYLIST
 // =====================================================
 
 async function addTracksToSpotifyPlaylist(
@@ -2804,8 +3301,7 @@ async function addTracksToSpotifyPlaylist(
     trackUris
 ) {
 
-    const CHUNK_SIZE =
-        100;
+    const CHUNK_SIZE = 100;
 
 
     for (
@@ -2842,37 +3338,21 @@ async function addTracksToSpotifyPlaylist(
 
 
 // =====================================================
-// Save to Spotify Button
+// SAVE TO SPOTIFY BUTTON
 // =====================================================
-// Uses event delegation so the generated/result UI
-// does not need to have its own listener setup.
 
-document.addEventListener(
-    "click",
-    event => {
+if (saveSpotifyBtn) {
 
-        if (
-            !event.target.classList.contains(
-                "spotify-btn"
-            )
-        ) {
+    saveSpotifyBtn.addEventListener(
+        "click",
+        savePlaylistToSpotify
+    );
 
-            return;
-
-        }
+}
 
 
-        if (
-            event.target.innerText.trim() !==
-            "Save to Spotify"
-        ) {
+// =====================================================
+// START APPLICATION
+// =====================================================
 
-            return;
-
-        }
-
-
-        savePlaylistToSpotify();
-
-    }
-);
+initSpotifyAuth();
