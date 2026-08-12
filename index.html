@@ -4,8 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Playlist Generator</title>
-
+    <title>GenPlaylist</title>
     <link rel="stylesheet" href="style.css">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -43,94 +42,162 @@
 
     </nav>
 
-    <!-- Hero -->
 
-    <header class="hero">
+    <!-- Welcome / Hero -->
+
+    <header class="hero" id="welcomeHero">
 
         <div class="hero-text">
+            <div class="welcome-icon">
+                <i class="fa-brands fa-spotify"></i>
+            </div>
 
-            <h1>Create the Perfect Playlist in One Click.</h1>
+            <h1> Create the Perfect Playlist in One Click. </h1>
 
             <p>
-                Choose your favourite libraries, select your intention,
-                and let GenPlaylist generate a playlist built around
-                your own music.
+                Connect your Spotify account to build personalised
+                playlists from your own music, listening habits and
+                favourite songs.
             </p>
 
             <button id="startBtn" class="primary-btn">
-                Generate Playlist
+                <i class="fa-brands fa-spotify"></i>
+                Connect to Spotify
             </button>
 
         </div>
 
     </header>
 
-    <!-- Dashboard -->
 
-    <main class="dashboard">
+    <!-- ==========================================
+         Dashboard
+         Hidden until Spotify is connected
+    =========================================== -->
 
-        <!-- Libraries -->
+    <main class="dashboard hidden" id="dashboard">
+
+        <!-- ======================================
+             Libraries
+        ======================================= -->
 
         <section class="card">
+            <div class="section-heading">
+                <div>
+                    <h2>
+                        <i class="fa-solid fa-folder-open"></i>
+                        Your Libraries
+                    </h2>
 
-            <h2>
-                <i class="fa-solid fa-folder-open"></i>
-                Your Libraries
-            </h2>
+                    <p>
+                        Choose the playlists GenPlaylist can use.
+                    </p>
+                </div>
 
-            <p>Select the playlists you trust.</p>
+
+                <div class="selection-actions">
+                    <button type="button" id="selectAllPlaylists" class="secondary-btn">
+                        Select All
+                    </button>
+
+                    <button type="button" id="deselectAllPlaylists" class="secondary-btn">
+                        Deselect All
+                    </button>
+                </div>
+
+            </div>
+
 
             <div class="library-list" id="libraryList">
 
-                <p class="placeholder-text">Connect to Spotify to see your playlists here.</p>
+                <p class="placeholder-text">
+                    Loading your playlists…
+                </p>
 
             </div>
 
         </section>
 
-        <!-- Top Songs -->
+
+        <!-- ======================================
+             Current Favourite Songs
+        ======================================= -->
 
         <section class="card">
 
             <h2>
+
                 <i class="fa-solid fa-fire"></i>
+
                 Current Favourite Songs
+
             </h2>
 
-            <p>Select songs you want the playlist to revolve around.</p>
 
-            <div class="song-grid" id="songGrid">
+            <p>
+                Select songs you want the playlist to revolve around.
+            </p>
 
-                <p class="placeholder-text">Connect to Spotify to see your top songs here.</p>
+
+            <div
+                class="song-grid"
+                id="songGrid"
+            >
+
+                <p class="placeholder-text">
+                    Loading your top songs…
+                </p>
 
             </div>
 
         </section>
 
-        <!-- Playlist Intent -->
+
+        <!-- ======================================
+             Playlist Intention
+        ======================================= -->
 
         <section class="card">
 
             <h2>
+
                 <i class="fa-solid fa-sliders"></i>
+
                 Playlist Intention
+
             </h2>
+
 
             <div class="intent-grid">
 
-                <button class="intent selected">
+                <button
+                    class="intent selected"
+                    type="button"
+                >
                     Current Favourites
                 </button>
 
-                <button class="intent">
+
+                <button
+                    class="intent"
+                    type="button"
+                >
                     Rediscover Old Favourites
                 </button>
 
-                <button class="intent">
+
+                <button
+                    class="intent"
+                    type="button"
+                >
                     Balanced Mix
                 </button>
 
-                <button class="intent">
+
+                <button
+                    class="intent"
+                    type="button"
+                >
                     Surprise Me
                 </button>
 
@@ -138,37 +205,134 @@
 
         </section>
 
-        <!-- Playlist Settings -->
+
+        <!-- ======================================
+             Playlist Settings
+        ======================================= -->
 
         <section class="card">
 
             <h2>
+
                 <i class="fa-solid fa-list"></i>
+
                 Playlist Settings
+
             </h2>
+
 
             <div class="settings">
 
+
+                <!-- Playlist Name -->
+
                 <div>
 
-                    <label>Playlist Name</label>
+                    <label for="playlistName">
+                        Playlist Name
+                    </label>
 
                     <input
+                        id="playlistName"
                         type="text"
-                        placeholder="Morning Commute Mix">
+                        placeholder="Morning Commute Mix"
+                    >
 
                 </div>
 
+
+                <!-- Playlist Size Mode -->
+
                 <div>
 
-                    <label>Playlist Size</label>
+                    <label for="sizeMode">
+                        Playlist Size
+                    </label>
 
-                    <select>
+                    <select id="sizeMode">
 
-                        <option>25 Songs</option>
-                        <option selected>50 Songs</option>
-                        <option>75 Songs</option>
-                        <option>100 Songs</option>
+                        <option value="songs">
+                            Number of Songs
+                        </option>
+
+                        <option value="duration">
+                            Approximate Duration
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <!-- Number of Songs -->
+
+                <div id="songCountSetting">
+
+                    <label for="songCount">
+                        Number of Songs
+                    </label>
+
+                    <select id="songCount">
+
+                        <option value="25">
+                            25 Songs
+                        </option>
+
+                        <option
+                            value="50"
+                            selected
+                        >
+                            50 Songs
+                        </option>
+
+                        <option value="75">
+                            75 Songs
+                        </option>
+
+                        <option value="100">
+                            100 Songs
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <!-- Duration -->
+
+                <div
+                    id="durationSetting"
+                    class="hidden"
+                >
+
+                    <label for="playlistDuration">
+                        Approximate Duration
+                    </label>
+
+                    <select id="playlistDuration">
+
+                        <option value="30">
+                            30 Minutes
+                        </option>
+
+                        <option
+                            value="45"
+                            selected
+                        >
+                            45 Minutes
+                        </option>
+
+                        <option value="60">
+                            1 Hour
+                        </option>
+
+                        <option value="90">
+                            1 Hour 30 Minutes
+                        </option>
+
+                        <option value="120">
+                            2 Hours
+                        </option>
 
                     </select>
 
@@ -178,11 +342,18 @@
 
         </section>
 
-        <!-- Generate -->
+
+        <!-- ======================================
+             Generate
+        ======================================= -->
 
         <section class="generate-section">
 
-            <button id="generateBtn" class="generate-btn">
+            <button
+                id="generateBtn"
+                class="generate-btn"
+                type="button"
+            >
 
                 <i class="fa-solid fa-wand-magic-sparkles"></i>
 
@@ -192,13 +363,21 @@
 
         </section>
 
-        <!-- Loading -->
 
-        <section id="loading" class="loading hidden">
+        <!-- ======================================
+             Loading
+        ======================================= -->
+
+        <section
+            id="loading"
+            class="loading hidden"
+        >
 
             <div class="spinner"></div>
 
-            <h3>Generating your playlist...</h3>
+            <h3>
+                Generating your playlist...
+            </h3>
 
             <p>
                 Analysing your favourite songs,
@@ -207,15 +386,23 @@
 
         </section>
 
-        <!-- Playlist Result -->
 
-        <section id="result" class="result hidden">
+        <!-- ======================================
+             Playlist Result
+        ======================================= -->
+
+        <section
+            id="result"
+            class="result hidden"
+        >
 
             <div class="result-header">
 
                 <div>
 
-                    <h2>Your Playlist is Ready 🎵</h2>
+                    <h2>
+                        Your Playlist is Ready 🎵
+                    </h2>
 
                     <p>
                         Built from your selected libraries and
@@ -224,91 +411,36 @@
 
                 </div>
 
-                <button class="spotify-btn" id="saveDbBtn">
 
-                    Save Playlist
+                <div class="result-actions">
 
-                </button>
+                    <button
+                        class="spotify-btn"
+                        id="saveDbBtn"
+                        type="button"
+                    >
+                        Save Playlist
+                    </button>
 
-                <button class="spotify-btn">
 
-                    Save to Spotify
+                    <button
+                        class="spotify-btn"
+                        id="saveSpotifyBtn"
+                        type="button"
+                    >
+                        Save to Spotify
+                    </button>
 
-                </button>
+                </div>
 
             </div>
 
-            <div class="playlist-preview">
 
-                <div class="track">
+            <div
+                class="playlist-preview"
+            >
 
-                    <div class="album-art"></div>
-
-                    <div>
-
-                        <h4>Song Name</h4>
-
-                        <span>Artist</span>
-
-                    </div>
-
-                </div>
-
-                <div class="track">
-
-                    <div class="album-art"></div>
-
-                    <div>
-
-                        <h4>Song Name</h4>
-
-                        <span>Artist</span>
-
-                    </div>
-
-                </div>
-
-                <div class="track">
-
-                    <div class="album-art"></div>
-
-                    <div>
-
-                        <h4>Song Name</h4>
-
-                        <span>Artist</span>
-
-                    </div>
-
-                </div>
-
-                <div class="track">
-
-                    <div class="album-art"></div>
-
-                    <div>
-
-                        <h4>Song Name</h4>
-
-                        <span>Artist</span>
-
-                    </div>
-
-                </div>
-
-                <div class="track">
-
-                    <div class="album-art"></div>
-
-                    <div>
-
-                        <h4>Song Name</h4>
-
-                        <span>Artist</span>
-
-                    </div>
-
-                </div>
+                <!-- Tracks inserted by JavaScript -->
 
             </div>
 
@@ -316,7 +448,10 @@
 
     </main>
 
-    <!-- Footer -->
+
+    <!-- ==========================================
+         Footer
+    =========================================== -->
 
     <footer>
 
@@ -325,8 +460,6 @@
         </p>
 
     </footer>
-
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
     <script src="script.js"></script>
 
