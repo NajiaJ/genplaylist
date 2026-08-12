@@ -1,23 +1,41 @@
 // ==========================================
 // GenPlaylist
-// Human-Centred Design Project
 // script.js
+// Complete regenerated version
 // ==========================================
 
 
 // =====================================================
-// ELEMENTS
+// DOM ELEMENTS
 // =====================================================
 
-const loginBtn = document.getElementById("loginBtn");
-const startBtn = document.getElementById("startBtn");
-const generateBtn = document.getElementById("generateBtn");
+// IMPORTANT:
+// The current HTML contains TWO elements with id="loginBtn":
+// one in the navigation and one in the hero.
+//
+// Technically IDs should be unique, but we support both here
+// so both buttons continue working without changing the HTML.
 
-const dashboard = document.getElementById("dashboard");
-const welcomeHero = document.getElementById("welcomeHero");
+const loginButtons =
+    document.querySelectorAll("#loginBtn");
 
-const loadingSection = document.getElementById("loading");
-const resultSection = document.getElementById("result");
+const startBtn =
+    document.getElementById("startBtn");
+
+const generateBtn =
+    document.getElementById("generateBtn");
+
+const dashboard =
+    document.getElementById("dashboard");
+
+const welcomeHero =
+    document.getElementById("welcomeHero");
+
+const loadingSection =
+    document.getElementById("loading");
+
+const resultSection =
+    document.getElementById("result");
 
 const playlistPreview =
     document.querySelector(".playlist-preview");
@@ -46,12 +64,14 @@ const saveDbBtn =
 const saveSpotifyBtn =
     document.getElementById("saveSpotifyBtn");
 
-const selectAllPlaylists =
+const selectAllBtn =
     document.getElementById("selectAllPlaylists");
 
-const deselectAllPlaylists =
+const deselectAllBtn =
     document.getElementById("deselectAllPlaylists");
 
+
+// Playlist settings
 const sizeMode =
     document.getElementById("sizeMode");
 
@@ -68,81 +88,37 @@ const playlistDuration =
     document.getElementById("playlistDuration");
 
 
+// Playlist name
+const playlistNameInput =
+    document.getElementById("playlistName");
+
+
 // =====================================================
 // APPLICATION STATE
 // =====================================================
 
-let spotifyAccessToken = null;
+let selectedIntent =
+    "Current Favourites";
 
-let selectedIntent = "Current Favourites";
-
-
-// =====================================================
-// SPOTIFY CONFIGURATION
-// =====================================================
-
-const SPOTIFY_CLIENT_ID =
-    "147cdfbc274741aa9adc2ecdf0b24bc6";
-
-
-// IMPORTANT:
-// This produces:
-// https://najiaj.github.io/genplaylist/
-// when the site is hosted there.
-const REDIRECT_URI =
-    window.location.origin +
-    window.location.pathname;
-
-
-const SPOTIFY_SCOPES = [
-
-    "playlist-read-private",
-
-    "playlist-read-collaborative",
-
-    "playlist-modify-public",
-
-    "playlist-modify-private",
-
-    "user-library-read",
-
-    "user-top-read",
-
-    "user-read-recently-played"
-
-].join(" ");
-
-
-// =====================================================
-// SUPABASE CONFIGURATION
-// =====================================================
-
-const SUPABASE_URL =
-    "https://nyxawdoedmqtmtoihsmx.supabase.co";
-
-const SUPABASE_ANON_KEY =
-    "sb_publishable_vNeLmLSYzA2tgZ3Wz_vX3A_JM5rG_Z3";
-
-let supabaseClient = null;
+let spotifyAccessToken =
+    null;
 
 
 // =====================================================
 // ERROR HANDLING
 // =====================================================
 
-function showError(message, { retry } = {}) {
+function showError(message, options = {}) {
 
-    console.error(
-        "[GenPlaylist error]",
-        message
-    );
+    console.error("[GenPlaylist]", message);
 
     if (!errorBanner || !errorBannerText) {
-        alert(message);
+        console.error(message);
         return;
     }
 
-    errorBannerText.textContent = message;
+    errorBannerText.textContent =
+        message;
 
     errorBanner.classList.remove("hidden");
 
@@ -150,43 +126,52 @@ function showError(message, { retry } = {}) {
     const existingRetry =
         errorBanner.querySelector(".retry-btn");
 
-
     if (existingRetry) {
         existingRetry.remove();
     }
 
 
-    if (typeof retry === "function") {
+    if (typeof options.retry === "function") {
 
-        const retryBtn =
+        const retryButton =
             document.createElement("button");
 
-        retryBtn.className =
+        retryButton.className =
             "retry-btn";
 
-        retryBtn.type =
+        retryButton.type =
             "button";
 
-        retryBtn.textContent =
+        retryButton.textContent =
             "Retry";
 
 
-        retryBtn.addEventListener(
+        retryButton.addEventListener(
             "click",
             () => {
 
                 clearError();
 
-                retry();
+                options.retry();
 
             }
         );
 
 
-        errorBanner.insertBefore(
-            retryBtn,
-            errorBannerDismiss
-        );
+        if (errorBannerDismiss) {
+
+            errorBanner.insertBefore(
+                retryButton,
+                errorBannerDismiss
+            );
+
+        } else {
+
+            errorBanner.appendChild(
+                retryButton
+            );
+
+        }
 
     }
 
@@ -201,7 +186,6 @@ function clearError() {
 
     errorBanner.classList.add("hidden");
 
-
     if (errorBannerText) {
         errorBannerText.textContent = "";
     }
@@ -209,7 +193,6 @@ function clearError() {
 
     const existingRetry =
         errorBanner.querySelector(".retry-btn");
-
 
     if (existingRetry) {
         existingRetry.remove();
@@ -237,7 +220,7 @@ window.addEventListener(
     event => {
 
         console.error(
-            "[GenPlaylist window error]",
+            "[GenPlaylist JS error]",
             event.error || event.message
         );
 
@@ -254,7 +237,7 @@ window.addEventListener(
     event => {
 
         console.error(
-            "[GenPlaylist promise error]",
+            "[GenPlaylist Promise error]",
             event.reason
         );
 
@@ -265,10 +248,6 @@ window.addEventListener(
     }
 );
 
-
-// =====================================================
-// NETWORK STATUS
-// =====================================================
 
 window.addEventListener(
     "offline",
@@ -289,7 +268,7 @@ window.addEventListener(
 
 
 // =====================================================
-// SMALL UTILITY
+// SMALL HELPERS
 // =====================================================
 
 function sleep(ms) {
@@ -301,20 +280,68 @@ function sleep(ms) {
 }
 
 
+function escapeHtml(value) {
+
+    const div =
+        document.createElement("div");
+
+    div.textContent =
+        value == null
+            ? ""
+            : String(value);
+
+    return div.innerHTML;
+
+}
+
+
+function getSmallestImage(album) {
+
+    if (
+        !album ||
+        !album.images ||
+        album.images.length === 0
+    ) {
+
+        return null;
+
+    }
+
+    return album.images[
+        album.images.length - 1
+    ].url;
+
+}
+
+
 // =====================================================
-// PAGE / DASHBOARD STATE
+// DASHBOARD VISIBILITY
 // =====================================================
 
 function showDashboard() {
 
-    if (dashboard) {
-        dashboard.classList.remove("hidden");
-    }
-
-
     if (welcomeHero) {
-        welcomeHero.classList.add("hidden");
+
+        welcomeHero.classList.add(
+            "hidden"
+        );
+
     }
+
+
+    if (dashboard) {
+
+        dashboard.classList.remove(
+            "hidden"
+        );
+
+    }
+
+
+    window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+    });
 
 }
 
@@ -322,67 +349,59 @@ function showDashboard() {
 function hideDashboard() {
 
     if (dashboard) {
-        dashboard.classList.add("hidden");
+
+        dashboard.classList.add(
+            "hidden"
+        );
+
     }
 
 
     if (welcomeHero) {
-        welcomeHero.classList.remove("hidden");
+
+        welcomeHero.classList.remove(
+            "hidden"
+        );
+
     }
 
 }
 
 
 // =====================================================
-// SPOTIFY BUTTON STATES
+// SPOTIFY CONFIGURATION
 // =====================================================
 
-function setSpotifyConnectedState() {
-
-    if (!loginBtn) {
-        return;
-    }
+const SPOTIFY_CLIENT_ID =
+    "147cdfbc274741aa9adc2ecdf0b24bc6";
 
 
-    loginBtn.textContent =
-        "Log Out";
+const REDIRECT_URI =
+    window.location.origin +
+    window.location.pathname;
 
 
-    loginBtn.disabled =
-        false;
+const SPOTIFY_SCOPES = [
 
+    "playlist-read-private",
 
-    loginBtn.classList.add(
-        "logout-state"
-    );
+    "playlist-read-collaborative",
 
-}
+    "playlist-modify-public",
 
+    "playlist-modify-private",
 
-function setSpotifyDisconnectedState() {
+    "user-library-read",
 
-    if (!loginBtn) {
-        return;
-    }
+    "user-top-read",
 
+    "user-read-recently-played"
 
-    loginBtn.textContent =
-        "Connect Spotify";
-
-
-    loginBtn.disabled =
-        false;
-
-
-    loginBtn.classList.remove(
-        "logout-state"
-    );
-
-}
+].join(" ");
 
 
 // =====================================================
-// PKCE HELPERS
+// PKCE
 // =====================================================
 
 function base64UrlEncode(bytes) {
@@ -399,11 +418,10 @@ function base64UrlEncode(bytes) {
 }
 
 
-async function pkceChallenge() {
+async function createPkceChallenge() {
 
     const verifierBytes =
         new Uint8Array(64);
-
 
     crypto.getRandomValues(
         verifierBytes
@@ -425,22 +443,22 @@ async function pkceChallenge() {
         );
 
 
+    const challenge =
+        base64UrlEncode(
+            digest
+        );
+
+
     return {
-
         verifier,
-
-        challenge:
-            base64UrlEncode(
-                digest
-            )
-
+        challenge
     };
 
 }
 
 
 // =====================================================
-// START SPOTIFY LOGIN
+// SPOTIFY LOGIN
 // =====================================================
 
 async function redirectToSpotifyLogin() {
@@ -448,7 +466,7 @@ async function redirectToSpotifyLogin() {
     if (!SPOTIFY_CLIENT_ID) {
 
         showError(
-            "No Spotify Client ID is configured."
+            "Spotify Client ID is missing."
         );
 
         return;
@@ -461,7 +479,8 @@ async function redirectToSpotifyLogin() {
         const {
             verifier,
             challenge
-        } = await pkceChallenge();
+        } =
+            await createPkceChallenge();
 
 
         sessionStorage.setItem(
@@ -494,27 +513,20 @@ async function redirectToSpotifyLogin() {
             });
 
 
-        console.log(
-            "[GenPlaylist] Redirect URI:",
-            REDIRECT_URI
-        );
-
-
         window.location.href =
-            "https://accounts.spotify.com/authorize?" +
-            params.toString();
+            `https://accounts.spotify.com/authorize?${params.toString()}`;
 
 
-    } catch (err) {
+    } catch (error) {
 
         console.error(
-            "[GenPlaylist login error]",
-            err
+            "[Spotify login]",
+            error
         );
 
 
         showError(
-            "Couldn't start the Spotify login. Please try again.",
+            "Couldn't start Spotify login. Please try again.",
             {
                 retry:
                     redirectToSpotifyLogin
@@ -527,7 +539,7 @@ async function redirectToSpotifyLogin() {
 
 
 // =====================================================
-// EXCHANGE AUTHORIZATION CODE FOR TOKEN
+// EXCHANGE CODE FOR TOKEN
 // =====================================================
 
 async function exchangeCodeForToken(code) {
@@ -556,8 +568,7 @@ async function exchangeCodeForToken(code) {
             grant_type:
                 "authorization_code",
 
-            code:
-                code,
+            code,
 
             redirect_uri:
                 REDIRECT_URI,
@@ -578,18 +589,14 @@ async function exchangeCodeForToken(code) {
                 "https://accounts.spotify.com/api/token",
                 {
 
-                    method:
-                        "POST",
+                    method: "POST",
 
                     headers: {
-
                         "Content-Type":
                             "application/x-www-form-urlencoded"
-
                     },
 
-                    body:
-                        body.toString()
+                    body
 
                 }
             );
@@ -613,14 +620,13 @@ async function exchangeCodeForToken(code) {
             const json =
                 await response.json();
 
-
             detail =
                 json.error_description ||
                 json.error ||
                 "";
 
         } catch (_) {
-            // Ignore invalid response body.
+            // Ignore invalid JSON.
         }
 
 
@@ -633,24 +639,14 @@ async function exchangeCodeForToken(code) {
     }
 
 
-    const json =
+    const data =
         await response.json();
 
 
-    if (!json.access_token) {
-
-        throw new Error(
-            "TOKEN_EXCHANGE_FAILED"
-        );
-
-    }
-
-
     spotifyAccessToken =
-        json.access_token;
+        data.access_token;
 
 
-    // The verifier is no longer needed.
     sessionStorage.removeItem(
         "spotify_pkce_verifier"
     );
@@ -659,7 +655,7 @@ async function exchangeCodeForToken(code) {
 
 
 // =====================================================
-// SPOTIFY API FETCH
+// SPOTIFY API
 // =====================================================
 
 async function spotifyFetch(
@@ -710,15 +706,13 @@ async function spotifyFetch(
                 }
             );
 
-
     } catch (error) {
 
-        if (attempt <= 3) {
+        if (attempt < 3) {
 
             await sleep(
                 500 * attempt
             );
-
 
             return spotifyFetch(
                 path,
@@ -736,10 +730,10 @@ async function spotifyFetch(
     }
 
 
-    // Rate limiting
+    // Rate limited
     if (
         response.status === 429 &&
-        attempt <= 4
+        attempt < 4
     ) {
 
         const retryAfter =
@@ -765,14 +759,14 @@ async function spotifyFetch(
     }
 
 
-    // Spotify server errors
+    // Spotify server error
     if (
         response.status >= 500 &&
-        attempt <= 3
+        attempt < 3
     ) {
 
         await sleep(
-            400 * attempt
+            500 * attempt
         );
 
 
@@ -822,7 +816,9 @@ async function spotifyFetch(
 
 
     if (response.status === 204) {
+
         return null;
+
     }
 
 
@@ -837,26 +833,80 @@ async function spotifyFetch(
 
 async function spotifyFetchAllPages(path) {
 
-    let items = [];
+    const items = [];
 
-    let url = path;
-
-
-    while (url) {
-
-        const json =
-            await spotifyFetch(url);
+    let nextUrl =
+        path;
 
 
-        items =
-            items.concat(
-                json.items || []
+    while (nextUrl) {
+
+        let response;
+
+
+        if (
+            nextUrl.startsWith(
+                "https://api.spotify.com/v1"
+            )
+        ) {
+
+            response =
+                await fetch(
+                    nextUrl,
+                    {
+
+                        headers: {
+                            Authorization:
+                                `Bearer ${spotifyAccessToken}`
+                        }
+
+                    }
+                );
+
+
+            if (response.status === 401) {
+
+                throw new Error(
+                    "AUTH_EXPIRED"
+                );
+
+            }
+
+
+            if (!response.ok) {
+
+                throw new Error(
+                    `SPOTIFY_ERROR_${response.status}`
+                );
+
+            }
+
+
+            response =
+                await response.json();
+
+        } else {
+
+            response =
+                await spotifyFetch(
+                    nextUrl
+                );
+
+        }
+
+
+        if (Array.isArray(response.items)) {
+
+            items.push(
+                ...response.items
             );
 
+        }
 
-        url =
-            json.next
-                ? json.next.replace(
+
+        nextUrl =
+            response.next
+                ? response.next.replace(
                     "https://api.spotify.com/v1",
                     ""
                 )
@@ -871,61 +921,43 @@ async function spotifyFetchAllPages(path) {
 
 
 // =====================================================
-// FRIENDLY SPOTIFY ERRORS
+// FRIENDLY ERRORS
 // =====================================================
 
 function friendlyMessageFor(error) {
 
     switch (
-        error &&
-        error.message
+        error?.message
     ) {
 
         case "NETWORK_ERROR":
 
-            return (
-                "Couldn't reach Spotify. " +
-                "Check your connection and try again."
-            );
+            return "Couldn't reach Spotify. Check your internet connection and try again.";
 
 
         case "AUTH_EXPIRED":
 
-            return (
-                "Your Spotify session expired. " +
-                "Please reconnect."
-            );
+            return "Your Spotify session expired. Please reconnect.";
 
 
         case "FORBIDDEN":
 
-            return (
-                "Spotify denied that request. " +
-                "Please reconnect and make sure the required permissions are approved."
-            );
+            return "Spotify denied that request. Please reconnect and make sure the required permissions are approved.";
 
 
         case "NOT_FOUND":
 
-            return (
-                "Spotify couldn't find that resource."
-            );
+            return "Spotify couldn't find that resource.";
 
 
         case "MISSING_VERIFIER":
 
-            return (
-                "The Spotify login session was lost. " +
-                "Please click Connect Spotify and try again."
-            );
+            return "The Spotify login session was lost. Please reconnect.";
 
 
         default:
 
-            return (
-                "Something went wrong talking to Spotify. " +
-                "Please try again."
-            );
+            return "Something went wrong while communicating with Spotify.";
 
     }
 
@@ -933,78 +965,41 @@ function friendlyMessageFor(error) {
 
 
 // =====================================================
-// SPOTIFY LOGOUT
+// LOGIN BUTTON STATE
 // =====================================================
 
-function fakeSpotifyLogout() {
+function setSpotifyConnectedState() {
 
-    // Clear access token.
-    spotifyAccessToken = null;
+    loginButtons.forEach(button => {
 
+        button.innerHTML =
+            "Log Out";
 
-    // Clear PKCE data.
-    sessionStorage.removeItem(
-        "spotify_pkce_verifier"
-    );
+        button.disabled =
+            false;
 
-
-    // Reset button.
-    setSpotifyDisconnectedState();
-
-
-    // Hide dashboard.
-    hideDashboard();
-
-
-    // Reset libraries.
-    libraryList.innerHTML =
-        `<p class="placeholder-text">
-            Connect to Spotify to see your playlists here.
-        </p>`;
-
-
-    // Reset songs.
-    songGrid.innerHTML =
-        `<p class="placeholder-text">
-            Connect to Spotify to see your top songs here.
-        </p>`;
-
-
-    // Hide generated content.
-    loadingSection.classList.add(
-        "hidden"
-    );
-
-    resultSection.classList.add(
-        "hidden"
-    );
-
-
-    // Clear playlist.
-    playlistPreview.innerHTML = "";
-
-
-    // Clear playlist name.
-    const nameInput =
-        document.getElementById(
-            "playlistName"
+        button.classList.add(
+            "logout-state"
         );
 
+    });
 
-    if (nameInput) {
-        nameInput.value = "";
-    }
-
-
-    clearError();
+}
 
 
-    // Return to top.
-    window.scrollTo({
+function setSpotifyDisconnectedState() {
 
-        top: 0,
+    loginButtons.forEach(button => {
 
-        behavior: "smooth"
+        button.innerHTML =
+            "Connect to Spotify";
+
+        button.disabled =
+            false;
+
+        button.classList.remove(
+            "logout-state"
+        );
 
     });
 
@@ -1012,18 +1007,80 @@ function fakeSpotifyLogout() {
 
 
 // =====================================================
-// NAVIGATION LOGIN / LOGOUT BUTTON
+// LOGOUT
 // =====================================================
 
-if (loginBtn) {
+function logoutFromGenPlaylist() {
 
-    loginBtn.addEventListener(
+    spotifyAccessToken =
+        null;
+
+
+    sessionStorage.removeItem(
+        "spotify_pkce_verifier"
+    );
+
+
+    setSpotifyDisconnectedState();
+
+
+    hideDashboard();
+
+
+    libraryList.innerHTML =
+        `
+        <p class="placeholder-text">
+            Connect to Spotify to see your playlists here.
+        </p>
+        `;
+
+
+    songGrid.innerHTML =
+        `
+        <p class="placeholder-text">
+            Connect to Spotify to see your top songs here.
+        </p>
+        `;
+
+
+    playlistPreview.innerHTML =
+        "";
+
+
+    loadingSection?.classList.add(
+        "hidden"
+    );
+
+
+    resultSection?.classList.add(
+        "hidden"
+    );
+
+
+    clearError();
+
+
+    window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+    });
+
+}
+
+
+// =====================================================
+// LOGIN BUTTON EVENTS
+// =====================================================
+
+loginButtons.forEach(button => {
+
+    button.addEventListener(
         "click",
         () => {
 
             if (spotifyAccessToken) {
 
-                fakeSpotifyLogout();
+                logoutFromGenPlaylist();
 
             } else {
 
@@ -1034,39 +1091,14 @@ if (loginBtn) {
         }
     );
 
-}
+});
 
 
 // =====================================================
-// HERO CONNECT BUTTON
+// SPOTIFY AUTH INITIALISATION
 // =====================================================
 
-if (startBtn) {
-
-    startBtn.addEventListener(
-        "click",
-        redirectToSpotifyLogin
-    );
-
-}
-
-
-// =====================================================
-// INITIALISE SPOTIFY AUTHENTICATION
-// =====================================================
-
-async function initSpotifyAuth() {
-
-    console.log(
-        "[GenPlaylist] Initialising Spotify authentication..."
-    );
-
-
-    console.log(
-        "[GenPlaylist] Redirect URI:",
-        REDIRECT_URI
-    );
-
+async function initialiseSpotifyAuth() {
 
     const params =
         new URLSearchParams(
@@ -1083,7 +1115,7 @@ async function initSpotifyAuth() {
 
 
     // -----------------------------------------
-    // Spotify denied/cancelled login
+    // User cancelled login
     // -----------------------------------------
 
     if (authError) {
@@ -1106,10 +1138,12 @@ async function initSpotifyAuth() {
 
 
     // -----------------------------------------
-    // Normal page visit
+    // No authorization code
     // -----------------------------------------
 
     if (!code) {
+
+        hideDashboard();
 
         return;
 
@@ -1117,7 +1151,7 @@ async function initSpotifyAuth() {
 
 
     // -----------------------------------------
-    // Remove ?code= from browser URL
+    // Remove code from browser URL
     // -----------------------------------------
 
     window.history.replaceState(
@@ -1129,35 +1163,20 @@ async function initSpotifyAuth() {
 
     try {
 
-        console.log(
-            "[GenPlaylist] Spotify authorization code received."
-        );
-
-
         await exchangeCodeForToken(
             code
         );
 
 
-        console.log(
-            "[GenPlaylist] Spotify access token received."
-        );
-
-
-        // -----------------------------------------
-        // THIS IS THE IMPORTANT PART
-        // -----------------------------------------
-
         setSpotifyConnectedState();
 
+
+        // THIS is what makes the dashboard appear.
         showDashboard();
+
 
         clearError();
 
-
-        // -----------------------------------------
-        // Load Spotify data
-        // -----------------------------------------
 
         await loadLibrariesAndAnchors();
 
@@ -1165,12 +1184,17 @@ async function initSpotifyAuth() {
     } catch (error) {
 
         console.error(
-            "[GenPlaylist auth error]",
+            "[Spotify authentication]",
             error
         );
 
 
+        spotifyAccessToken =
+            null;
+
+
         setSpotifyDisconnectedState();
+
 
         hideDashboard();
 
@@ -1189,58 +1213,57 @@ async function initSpotifyAuth() {
 
 
 // =====================================================
-// LOAD SPOTIFY LIBRARIES + TOP SONGS
+// LOAD SPOTIFY DATA
 // =====================================================
 
 async function loadLibrariesAndAnchors() {
 
     libraryList.innerHTML =
-        `<p class="placeholder-text">
+        `
+        <p class="placeholder-text">
             Loading your playlists…
-        </p>`;
+        </p>
+        `;
 
 
     songGrid.innerHTML =
-        `<p class="placeholder-text">
+        `
+        <p class="placeholder-text">
             Loading your top songs…
-        </p>`;
+        </p>
+        `;
 
 
     // -----------------------------------------
-    // Playlists + liked songs
+    // Playlists + Liked Songs
     // -----------------------------------------
 
     try {
 
         const [
-            playlistsResponse,
-            likedResponse
-        ] = await Promise.all([
+            playlists,
+            liked
+        ] =
+            await Promise.all([
 
-            spotifyFetch(
-                "/me/playlists?limit=50"
-            ),
+                spotifyFetch(
+                    "/me/playlists?limit=50"
+                ),
 
-            spotifyFetch(
-                "/me/tracks?limit=1"
-            )
+                spotifyFetch(
+                    "/me/tracks?limit=1"
+                )
 
-        ]);
+            ]);
 
 
         renderLibraries(
-            playlistsResponse.items || [],
-            likedResponse.total || 0
+            playlists.items || [],
+            liked.total || 0
         );
 
 
     } catch (error) {
-
-        console.error(
-            "[GenPlaylist library error]",
-            error
-        );
-
 
         if (
             error.message ===
@@ -1255,9 +1278,11 @@ async function loadLibrariesAndAnchors() {
 
 
         libraryList.innerHTML =
-            `<p class="placeholder-text">
+            `
+            <p class="placeholder-text">
                 Couldn't load your playlists.
-            </p>`;
+            </p>
+            `;
 
 
         showError(
@@ -1272,34 +1297,30 @@ async function loadLibrariesAndAnchors() {
 
 
     // -----------------------------------------
-    // Top tracks
+    // Top Tracks
     // -----------------------------------------
 
     try {
 
-        const topResponse =
+        const topTracks =
             await spotifyFetch(
                 "/me/top/tracks?time_range=short_term&limit=8"
             );
 
 
         renderTopSongs(
-            topResponse.items || []
+            topTracks.items || []
         );
 
 
     } catch (error) {
 
-        console.error(
-            "[GenPlaylist top tracks error]",
-            error
-        );
-
-
         songGrid.innerHTML =
-            `<p class="placeholder-text">
-                No top songs available yet — you can still generate a playlist without anchors.
-            </p>`;
+            `
+            <p class="placeholder-text">
+                No top songs are available yet.
+            </p>
+            `;
 
     }
 
@@ -1315,13 +1336,11 @@ function renderLibraries(
     likedCount
 ) {
 
-    libraryList.innerHTML = "";
+    libraryList.innerHTML =
+        "";
 
 
-    // -----------------------------------------
     // Liked Songs
-    // -----------------------------------------
-
     const likedLabel =
         document.createElement("label");
 
@@ -1348,10 +1367,7 @@ function renderLibraries(
     );
 
 
-    // -----------------------------------------
-    // User playlists
-    // -----------------------------------------
-
+    // Playlists
     playlists.forEach(
         playlist => {
 
@@ -1363,11 +1379,10 @@ function renderLibraries(
                 "library-item";
 
 
-            const trackCount =
-                playlist.tracks &&
-                typeof playlist.tracks.total === "number"
-                    ? playlist.tracks.total
-                    : "?";
+            const count =
+                playlist.tracks?.total ??
+                playlist.items?.total ??
+                "?";
 
 
             label.innerHTML =
@@ -1376,11 +1391,11 @@ function renderLibraries(
                     type="checkbox"
                     checked
                     data-id="${escapeHtml(playlist.id)}"
-                    data-count="${trackCount}"
+                    data-count="${count}"
                 >
 
                 ${escapeHtml(playlist.name)}
-                (${trackCount})
+                (${count})
                 `;
 
 
@@ -1400,7 +1415,8 @@ function renderLibraries(
 
 function renderTopSongs(tracks) {
 
-    songGrid.innerHTML = "";
+    songGrid.innerHTML =
+        "";
 
 
     if (
@@ -1409,198 +1425,107 @@ function renderTopSongs(tracks) {
     ) {
 
         songGrid.innerHTML =
-            `<p class="placeholder-text">
-                No top songs yet — play some music on Spotify first.
-            </p>`;
-
+            `
+            <p class="placeholder-text">
+                No top songs available yet.
+            </p>
+            `;
 
         return;
 
     }
 
 
-    tracks.forEach(
-        track => {
+    tracks.forEach(track => {
 
-            const label =
-                document.createElement("label");
-
-
-            label.className =
-                "song-card";
+        const label =
+            document.createElement("label");
 
 
-            const image =
-                getSmallestImage(
-                    track.album
-                ) || "";
+        label.className =
+            "song-card";
 
 
-            const artist =
-                (track.artists || [])
-                    .map(
-                        artist =>
-                            artist.name
-                    )
-                    .join(", ");
+        const image =
+            getSmallestImage(
+                track.album
+            ) || "";
 
 
-            label.innerHTML =
-                `
-                <input
-                    type="checkbox"
-                    data-id="${escapeHtml(track.id)}"
-                    data-uri="${escapeHtml(track.uri || "")}"
-                    data-title="${escapeHtml(track.name)}"
-                    data-artist="${escapeHtml(artist)}"
-                    data-image="${escapeHtml(image)}"
-                >
-
-                ${escapeHtml(track.name)}
-                — ${escapeHtml(artist)}
-                `;
+        const artist =
+            (track.artists || [])
+                .map(
+                    artist =>
+                        artist.name
+                )
+                .join(", ");
 
 
-            songGrid.appendChild(
-                label
-            );
+        label.innerHTML =
+            `
+            <input
+                type="checkbox"
+                data-id="${escapeHtml(track.id)}"
+                data-uri="${escapeHtml(track.uri || "")}"
+                data-title="${escapeHtml(track.name)}"
+                data-artist="${escapeHtml(artist)}"
+                data-image="${escapeHtml(image)}"
+            >
 
+            ${escapeHtml(track.name)}
+            — ${escapeHtml(artist)}
+            `;
+
+
+        songGrid.appendChild(
+            label
+        );
+
+    });
+
+}
+
+
+// =====================================================
+// SELECT ALL / DESELECT ALL
+// =====================================================
+
+function setAllLibraries(checked) {
+
+    const checkboxes =
+        libraryList.querySelectorAll(
+            'input[type="checkbox"]'
+        );
+
+
+    checkboxes.forEach(
+        checkbox => {
+            checkbox.checked =
+                checked;
         }
     );
 
 }
 
 
-// =====================================================
-// HTML ESCAPING
-// =====================================================
+if (selectAllBtn) {
 
-function escapeHtml(value) {
-
-    const div =
-        document.createElement("div");
-
-
-    div.textContent =
-        value == null
-            ? ""
-            : String(value);
-
-
-    return div.innerHTML;
-
-}
-
-
-// =====================================================
-// ALBUM ART HELPER
-// =====================================================
-
-function getSmallestImage(album) {
-
-    if (
-        !album ||
-        !album.images ||
-        album.images.length === 0
-    ) {
-
-        return null;
-
-    }
-
-
-    return album.images[
-        album.images.length - 1
-    ].url;
-
-}
-
-
-// =====================================================
-// AUTH EXPIRED
-// =====================================================
-
-function handleAuthExpired() {
-
-    spotifyAccessToken = null;
-
-
-    sessionStorage.removeItem(
-        "spotify_pkce_verifier"
-    );
-
-
-    setSpotifyDisconnectedState();
-
-
-    hideDashboard();
-
-
-    libraryList.innerHTML =
-        `<p class="placeholder-text">
-            Connect to Spotify to see your playlists here.
-        </p>`;
-
-
-    songGrid.innerHTML =
-        `<p class="placeholder-text">
-            Connect to Spotify to see your top songs here.
-        </p>`;
-
-
-    showError(
-        "Your Spotify session expired. Please reconnect.",
-        {
-            retry:
-                redirectToSpotifyLogin
-        }
-    );
-
-}
-
-
-// =====================================================
-// SELECT / DESELECT PLAYLISTS
-// =====================================================
-
-if (selectAllPlaylists) {
-
-    selectAllPlaylists.addEventListener(
+    selectAllBtn.addEventListener(
         "click",
         () => {
-
-            libraryList
-                .querySelectorAll(
-                    'input[type="checkbox"]'
-                )
-                .forEach(
-                    checkbox => {
-                        checkbox.checked = true;
-                    }
-                );
-
+            setAllLibraries(true);
         }
     );
 
 }
 
 
-if (deselectAllPlaylists) {
+if (deselectAllBtn) {
 
-    deselectAllPlaylists.addEventListener(
+    deselectAllBtn.addEventListener(
         "click",
         () => {
-
-            libraryList
-                .querySelectorAll(
-                    'input[type="checkbox"]'
-                )
-                .forEach(
-                    checkbox => {
-                        checkbox.checked = false;
-                    }
-                );
-
+            setAllLibraries(false);
         }
     );
 
@@ -1610,6 +1535,56 @@ if (deselectAllPlaylists) {
 // =====================================================
 // PLAYLIST SIZE MODE
 // =====================================================
+//
+// This is the important section for your current issue.
+//
+// If "Number of Songs" is selected:
+//     show songCountSetting
+//     hide durationSetting
+//
+// If "Approximate Duration" is selected:
+//     hide songCountSetting
+//     show durationSetting
+//
+// =====================================================
+
+function updatePlaylistSizeMode() {
+
+    if (!sizeMode) {
+        return;
+    }
+
+
+    const mode =
+        sizeMode.value;
+
+
+    if (mode === "duration") {
+
+        durationSetting?.classList.remove(
+            "hidden"
+        );
+
+
+        songCountSetting?.classList.add(
+            "hidden"
+        );
+
+    } else {
+
+        songCountSetting?.classList.remove(
+            "hidden"
+        );
+
+
+        durationSetting?.classList.add(
+            "hidden"
+        );
+
+    }
+
+}
+
 
 if (sizeMode) {
 
@@ -1621,110 +1596,161 @@ if (sizeMode) {
 }
 
 
-function updatePlaylistSizeMode() {
+// Run immediately when page loads.
+updatePlaylistSizeMode();
 
-    if (
-        sizeMode.value === "duration"
-    ) {
 
-        songCountSetting.classList.add(
-            "hidden"
-        );
+// =====================================================
+// CONVERT SIZE SETTING INTO TARGET SONG COUNT
+// =====================================================
+//
+// Spotify playlist generation ultimately needs a number
+// of tracks.
+//
+// For duration mode we estimate:
+// approximately 2.5 songs per minute.
+//
+// Examples:
+//
+// 30 min  -> ~75 songs
+// 45 min  -> ~112 songs
+// 60 min  -> ~150 songs
+// 90 min  -> ~225 songs
+// 120 min -> ~300 songs
+//
+// We also cap the result at 100 because Spotify playlist
+// generation shouldn't attempt to create an enormous
+// playlist from the current UI.
+// =====================================================
 
-        durationSetting.classList.remove(
-            "hidden"
-        );
+function getTargetSongCount() {
 
-    } else {
+    if (!sizeMode) {
 
-        songCountSetting.classList.remove(
-            "hidden"
-        );
-
-        durationSetting.classList.add(
-            "hidden"
-        );
+        return 50;
 
     }
 
-}
-
-
-// =====================================================
-// INTENTION SELECTION
-// =====================================================
-
-intentionButtons.forEach(
-    button => {
-
-        button.addEventListener(
-            "click",
-            () => {
-
-                intentionButtons.forEach(
-                    otherButton => {
-
-                        otherButton.classList.remove(
-                            "selected"
-                        );
-
-                    }
-                );
-
-
-                button.classList.add(
-                    "selected"
-                );
-
-
-                selectedIntent =
-                    button.textContent.trim();
-
-            }
-        );
-
-    }
-);
-
-
-// =====================================================
-// GET TARGET PLAYLIST SIZE
-// =====================================================
-
-function getTargetPlaylistSize() {
 
     if (
-        sizeMode.value === "duration"
+        sizeMode.value ===
+        "duration"
     ) {
 
         const minutes =
             parseInt(
-                playlistDuration.value,
+                playlistDuration?.value || "45",
                 10
-            ) || 45;
+            );
 
 
-        // Approximate 4 minutes per song.
-        return Math.max(
-            1,
-            Math.round(minutes / 4)
+        const estimated =
+            Math.round(
+                minutes * 2.5
+            );
+
+
+        return Math.min(
+            Math.max(
+                estimated,
+                1
+            ),
+            100
         );
 
     }
 
 
-    return (
+    const count =
         parseInt(
-            songCount.value,
+            songCount?.value || "50",
             10
-        ) || 50
+        );
+
+
+    return Math.min(
+        Math.max(
+            count,
+            1
+        ),
+        100
     );
 
 }
 
 
 // =====================================================
-// GENERATE BUTTON
+// INTENTION BUTTONS
+// =====================================================
+
+intentionButtons.forEach(button => {
+
+    button.addEventListener(
+        "click",
+        () => {
+
+            intentionButtons.forEach(
+                otherButton => {
+
+                    otherButton.classList.remove(
+                        "selected"
+                    );
+
+                }
+            );
+
+
+            button.classList.add(
+                "selected"
+            );
+
+
+            selectedIntent =
+                button.innerText.trim();
+
+        }
+    );
+
+});
+
+
+// =====================================================
+// HERO BUTTON SUPPORT
+// =====================================================
+//
+// Your current HTML has a duplicate loginBtn rather than
+// a startBtn.
+//
+// This means the loginButtons NodeList above handles it.
+//
+// This block also supports startBtn if you later change
+// the HTML to use that ID.
+// =====================================================
+
+if (startBtn) {
+
+    startBtn.addEventListener(
+        "click",
+        () => {
+
+            if (spotifyAccessToken) {
+
+                logoutFromGenPlaylist();
+
+            } else {
+
+                redirectToSpotifyLogin();
+
+            }
+
+        }
+    );
+
+}
+
+
+// =====================================================
+// GENERATE PLAYLIST BUTTON
 // =====================================================
 
 if (generateBtn) {
@@ -1753,6 +1779,10 @@ async function generatePlaylist() {
 
     }
 
+
+    // -----------------------------------------
+    // Selected libraries
+    // -----------------------------------------
 
     const selectedLibraries =
         Array.from(
@@ -1785,6 +1815,10 @@ async function generatePlaylist() {
     }
 
 
+    // -----------------------------------------
+    // Anchor songs
+    // -----------------------------------------
+
     const anchorTracks =
         Array.from(
             songGrid.querySelectorAll(
@@ -1812,32 +1846,39 @@ async function generatePlaylist() {
         );
 
 
+    // -----------------------------------------
+    // TARGET SIZE
+    // -----------------------------------------
+
     const targetSize =
-        getTargetPlaylistSize();
+        getTargetSongCount();
 
 
-    loadingSection.classList.remove(
+    console.log(
+        "[GenPlaylist] Target songs:",
+        targetSize
+    );
+
+
+    // -----------------------------------------
+    // Loading state
+    // -----------------------------------------
+
+    loadingSection?.classList.remove(
         "hidden"
     );
 
 
-    resultSection.classList.add(
+    resultSection?.classList.add(
         "hidden"
     );
-
-
-    window.scrollTo({
-
-        top:
-            loadingSection.offsetTop - 80,
-
-        behavior:
-            "smooth"
-
-    });
 
 
     try {
+
+        // -----------------------------------------
+        // Build track pool
+        // -----------------------------------------
 
         const pool =
             await buildTrackPool(
@@ -1856,11 +1897,19 @@ async function generatePlaylist() {
         }
 
 
+        // -----------------------------------------
+        // Listening signals
+        // -----------------------------------------
+
         const signals =
             await fetchSignalsWithFallback(
                 pool
             );
 
+
+        // -----------------------------------------
+        // Score tracks
+        // -----------------------------------------
 
         const scored =
             scorePool(
@@ -1868,6 +1917,10 @@ async function generatePlaylist() {
                 signals
             );
 
+
+        // -----------------------------------------
+        // Assemble playlist
+        // -----------------------------------------
 
         const playlist =
             assemblePlaylist(
@@ -1878,22 +1931,26 @@ async function generatePlaylist() {
             );
 
 
+        // -----------------------------------------
+        // Render
+        // -----------------------------------------
+
         renderPlaylist(
             playlist
         );
 
 
-        loadingSection.classList.add(
+        loadingSection?.classList.add(
             "hidden"
         );
 
 
-        resultSection.classList.remove(
+        resultSection?.classList.remove(
             "hidden"
         );
 
 
-        resultSection.scrollIntoView({
+        resultSection?.scrollIntoView({
             behavior: "smooth"
         });
 
@@ -1909,7 +1966,7 @@ async function generatePlaylist() {
         );
 
 
-        loadingSection.classList.add(
+        loadingSection?.classList.add(
             "hidden"
         );
 
@@ -1961,43 +2018,60 @@ async function buildTrackPool(
     selectedLibraries
 ) {
 
-    const results =
-        await Promise.allSettled(
+    const requests =
+        selectedLibraries.map(
+            source => {
 
-            selectedLibraries.map(
-                source => {
-
-                    if (
-                        source.isLiked
-                    ) {
-
-                        return spotifyFetchAllPages(
-                            "/me/tracks?limit=50"
-                        );
-
-                    }
-
+                if (source.isLiked) {
 
                     return spotifyFetchAllPages(
-                        `/playlists/${source.id}/items?limit=100`
+                        "/me/tracks?limit=50"
                     );
 
                 }
-            )
 
+
+                return spotifyFetchAllPages(
+                    `/playlists/${source.id}/items?limit=100`
+                );
+
+            }
         );
 
 
-    const byId =
+    const results =
+        await Promise.allSettled(
+            requests
+        );
+
+
+    const tracksById =
         new Map();
 
 
-    results.forEach(
-        result => {
+    results.forEach(result => {
+
+        if (
+            result.status !==
+            "fulfilled"
+        ) {
+
+            return;
+
+        }
+
+
+        result.value.forEach(entry => {
+
+            const track =
+                entry.item ||
+                entry.track ||
+                entry;
+
 
             if (
-                result.status !==
-                "fulfilled"
+                !track ||
+                !track.id
             ) {
 
                 return;
@@ -2005,51 +2079,34 @@ async function buildTrackPool(
             }
 
 
-            result.value.forEach(
-                entry => {
+            if (
+                !tracksById.has(
+                    track.id
+                )
+            ) {
 
-                    const track =
-                        entry.item ||
-                        entry.track;
+                tracksById.set(
+                    track.id,
+                    {
 
+                        ...track,
 
-                    if (
-                        !track ||
-                        !track.id
-                    ) {
-
-                        return;
-
-                    }
-
-
-                    if (
-                        !byId.has(track.id)
-                    ) {
-
-                        byId.set(
-                            track.id,
-                            {
-                                ...track,
-
-                                added_at:
-                                    entry.added_at ||
-                                    null
-
-                            }
-                        );
+                        added_at:
+                            entry.added_at ||
+                            null
 
                     }
+                );
 
-                }
-            );
+            }
 
-        }
-    );
+        });
+
+    });
 
 
     return Array.from(
-        byId.values()
+        tracksById.values()
     );
 
 }
@@ -2090,15 +2147,15 @@ async function fetchSignalsWithFallback(
         mediumResult,
         longResult,
         recentResult
-    ] = results;
+    ] =
+        results;
 
 
     const shortIds =
         new Set(
             shortResult.status === "fulfilled"
                 ? (
-                    shortResult.value.items ||
-                    []
+                    shortResult.value.items || []
                 ).map(
                     track => track.id
                 )
@@ -2110,8 +2167,7 @@ async function fetchSignalsWithFallback(
         new Set(
             mediumResult.status === "fulfilled"
                 ? (
-                    mediumResult.value.items ||
-                    []
+                    mediumResult.value.items || []
                 ).map(
                     track => track.id
                 )
@@ -2123,8 +2179,7 @@ async function fetchSignalsWithFallback(
         new Set(
             longResult.status === "fulfilled"
                 ? (
-                    longResult.value.items ||
-                    []
+                    longResult.value.items || []
                 ).map(
                     track => track.id
                 )
@@ -2136,28 +2191,25 @@ async function fetchSignalsWithFallback(
         new Set(
             recentResult.status === "fulfilled"
                 ? (
-                    recentResult.value.items ||
-                    []
+                    recentResult.value.items || []
                 )
                     .map(
                         item =>
-                            item.track &&
-                            item.track.id
+                            item.track?.id
                     )
                     .filter(Boolean)
                 : []
         );
 
 
-    const hasRealSignals =
-        shortIds.size +
-        mediumIds.size +
-        longIds.size +
-        recentIds.size >
-        0;
+    const hasSignals =
+        shortIds.size > 0 ||
+        mediumIds.size > 0 ||
+        longIds.size > 0 ||
+        recentIds.size > 0;
 
 
-    if (hasRealSignals) {
+    if (hasSignals) {
 
         return {
 
@@ -2178,10 +2230,10 @@ async function fetchSignalsWithFallback(
 
 
     // -----------------------------------------
-    // Fallback: playlist added dates
+    // Fallback using added_at
     // -----------------------------------------
 
-    const withDates =
+    const dated =
         pool
             .filter(
                 track =>
@@ -2203,7 +2255,7 @@ async function fetchSignalsWithFallback(
 
 
     if (
-        withDates.length === 0
+        dated.length === 0
     ) {
 
         return {
@@ -2214,22 +2266,18 @@ async function fetchSignalsWithFallback(
 
 
     const times =
-        withDates.map(
+        dated.map(
             item =>
                 item.addedAt
         );
 
 
     const newest =
-        Math.max(
-            ...times
-        );
+        Math.max(...times);
 
 
     const oldest =
-        Math.min(
-            ...times
-        );
+        Math.min(...times);
 
 
     return {
@@ -2237,7 +2285,8 @@ async function fetchSignalsWithFallback(
         mode:
             "added_at",
 
-        withDates,
+        withDates:
+            dated,
 
         newest,
 
@@ -2257,135 +2306,138 @@ function scorePool(
     signals
 ) {
 
-    return pool.map(
-        track => {
+    return pool.map(track => {
 
-            let recency = 0;
+        let recency = 0;
 
-            let dormancy = 0;
-
-
-            if (
-                signals.mode === "api"
-            ) {
-
-                const isRecent =
-                    signals.shortIds.has(
-                        track.id
-                    ) ||
-                    signals.recentIds.has(
-                        track.id
-                    );
+        let dormancy = 0;
 
 
-                const wasFavourite =
-                    signals.longIds.has(
-                        track.id
-                    ) ||
-                    signals.mediumIds.has(
-                        track.id
-                    );
+        if (
+            signals.mode ===
+            "api"
+        ) {
+
+            const isRecent =
+                signals.shortIds.has(
+                    track.id
+                ) ||
+                signals.recentIds.has(
+                    track.id
+                );
 
 
-                recency =
-                    isRecent
-                        ? 1
-                        : 0;
+            const wasFavourite =
+                signals.longIds.has(
+                    track.id
+                ) ||
+                signals.mediumIds.has(
+                    track.id
+                );
 
 
-                dormancy =
-                    wasFavourite &&
-                    !isRecent
-                        ? 1
-                        : 0;
-
-            }
-
-
-            else if (
-                signals.mode === "added_at" &&
-                track.added_at
-            ) {
-
-                const addedAt =
-                    new Date(
-                        track.added_at
-                    ).getTime();
-
-
-                const span =
-                    signals.newest -
-                    signals.oldest ||
-                    1;
-
-
-                recency =
-                    (
-                        addedAt -
-                        signals.oldest
-                    ) / span;
-
-
-                dormancy =
-                    1 - recency;
-
-            }
-
-
-            const baseline =
-                recency === 0 &&
-                dormancy === 0
-                    ? 0.15
+            recency =
+                isRecent
+                    ? 1
                     : 0;
 
 
-            return {
-
-                id:
-                    track.id,
-
-                title:
-                    track.name,
-
-                artist:
-                    (track.artists || [])
-                        .map(
-                            artist =>
-                                artist.name
-                        )
-                        .join(", "),
-
-                image:
-                    getSmallestImage(
-                        track.album
-                    ),
-
-                url:
-                    track.external_urls &&
-                    track.external_urls.spotify
-                        ? track.external_urls.spotify
-                        : `https://open.spotify.com/track/${track.id}`,
-
-                uri:
-                    track.uri,
-
-                recency,
-
-                dormancy,
-
-                baseline,
-
-                tag:
-                    dormancy > 0.5
-                        ? "worth revisiting"
-                        : recency > 0.5
-                            ? "in rotation"
-                            : ""
-
-            };
+            dormancy =
+                wasFavourite &&
+                !isRecent
+                    ? 1
+                    : 0;
 
         }
-    );
+
+
+        else if (
+            signals.mode ===
+            "added_at" &&
+            track.added_at
+        ) {
+
+            const addedAt =
+                new Date(
+                    track.added_at
+                ).getTime();
+
+
+            const span =
+                signals.newest -
+                signals.oldest ||
+                1;
+
+
+            recency =
+                (
+                    addedAt -
+                    signals.oldest
+                ) / span;
+
+
+            dormancy =
+                1 - recency;
+
+        }
+
+
+        const baseline =
+            (
+                recency === 0 &&
+                dormancy === 0
+            )
+                ? 0.15
+                : 0;
+
+
+        const artist =
+            (track.artists || [])
+                .map(
+                    artist =>
+                        artist.name
+                )
+                .join(", ");
+
+
+        return {
+
+            id:
+                track.id,
+
+            title:
+                track.name,
+
+            artist,
+
+            image:
+                getSmallestImage(
+                    track.album
+                ),
+
+            url:
+                track.external_urls?.spotify ||
+                `https://open.spotify.com/track/${track.id}`,
+
+            uri:
+                track.uri,
+
+            recency,
+
+            dormancy,
+
+            baseline,
+
+            tag:
+                dormancy > 0.5
+                    ? "worth revisiting"
+                    : recency > 0.5
+                        ? "in rotation"
+                        : ""
+
+        };
+
+    });
 
 }
 
@@ -2478,6 +2530,8 @@ function assemblePlaylist(
         );
 
 
+    // Anchor songs selected by the user that
+    // weren't found in the library pool.
     const missingAnchors =
         anchorTracks
             .filter(
@@ -2534,16 +2588,14 @@ function assemblePlaylist(
         );
 
 
-    const rest =
+    const selectedRest =
         weightedSampleWithoutReplacement(
             remainingPool,
-
             track =>
                 weightForIntent(
                     track,
                     intent
                 ),
-
             Math.min(
                 remainingSlots,
                 remainingPool.length
@@ -2557,7 +2609,7 @@ function assemblePlaylist(
 
         ...missingAnchors,
 
-        ...rest
+        ...selectedRest
 
     ]);
 
@@ -2596,7 +2648,8 @@ function weightedSampleWithoutReplacement(
         new Map();
 
 
-    const ARTIST_CAP = 3;
+    const ARTIST_CAP =
+        3;
 
 
     while (
@@ -2635,7 +2688,8 @@ function weightedSampleWithoutReplacement(
                 random <= 0
             ) {
 
-                selectedIndex = i;
+                selectedIndex =
+                    i;
 
                 break;
 
@@ -2648,21 +2702,20 @@ function weightedSampleWithoutReplacement(
             pool[selectedIndex].track;
 
 
-        const currentArtistCount =
-            artistCounts.get(
-                candidate.artist
-            ) || 0;
-
-
         pool.splice(
             selectedIndex,
             1
         );
 
 
+        const artistCount =
+            artistCounts.get(
+                candidate.artist
+            ) || 0;
+
+
         if (
-            currentArtistCount >=
-            ARTIST_CAP
+            artistCount >= ARTIST_CAP
         ) {
 
             continue;
@@ -2677,7 +2730,7 @@ function weightedSampleWithoutReplacement(
 
         artistCounts.set(
             candidate.artist,
-            currentArtistCount + 1
+            artistCount + 1
         );
 
     }
@@ -2710,7 +2763,8 @@ function shuffle(array) {
         [
             array[i],
             array[j]
-        ] = [
+        ] =
+        [
             array[j],
             array[i]
         ];
@@ -2729,14 +2783,32 @@ function shuffle(array) {
 
 function renderPlaylist(tracks) {
 
-    playlistPreview.innerHTML = "";
+    playlistPreview.innerHTML =
+        "";
+
+
+    if (
+        !tracks ||
+        tracks.length === 0
+    ) {
+
+        playlistPreview.innerHTML =
+            `
+            <p class="placeholder-text">
+                No tracks could be selected.
+            </p>
+            `;
+
+        return;
+
+    }
 
 
     tracks.forEach(
         track => {
 
             playlistPreview.appendChild(
-                createTrack(track)
+                createTrackElement(track)
             );
 
         }
@@ -2749,7 +2821,7 @@ function renderPlaylist(tracks) {
 // CREATE TRACK ELEMENT
 // =====================================================
 
-function createTrack(track) {
+function createTrackElement(track) {
 
     const container =
         document.createElement("div");
@@ -2778,8 +2850,8 @@ function createTrack(track) {
               `;
 
 
-    container.innerHTML = `
-
+    container.innerHTML =
+        `
         ${albumArt}
 
         <div>
@@ -2800,13 +2872,12 @@ function createTrack(track) {
             </small>
 
         </div>
-
-    `;
+        `;
 
 
     const image =
         container.querySelector(
-            "img"
+            "img.album-art"
         );
 
 
@@ -2816,18 +2887,17 @@ function createTrack(track) {
             "error",
             () => {
 
-                const fallback =
+                const replacement =
                     document.createElement(
                         "div"
                     );
 
-
-                fallback.className =
+                replacement.className =
                     "album-art";
 
 
                 image.replaceWith(
-                    fallback
+                    replacement
                 );
 
             }
@@ -2842,210 +2912,18 @@ function createTrack(track) {
 
 
 // =====================================================
-// SUPABASE CLIENT
+// SAVE GENERATED PLAYLIST TO SPOTIFY
 // =====================================================
 
-function getSupabaseClient() {
+if (saveSpotifyBtn) {
 
-    if (supabaseClient) {
-        return supabaseClient;
-    }
-
-
-    if (
-        !window.supabase ||
-        typeof window.supabase.createClient !==
-        "function"
-    ) {
-
-        throw new Error(
-            "SUPABASE_LIBRARY_MISSING"
-        );
-
-    }
-
-
-    supabaseClient =
-        window.supabase.createClient(
-            SUPABASE_URL,
-            SUPABASE_ANON_KEY
-        );
-
-
-    return supabaseClient;
-
-}
-
-
-// =====================================================
-// SAVE PLAYLIST TO SUPABASE
-// =====================================================
-
-async function savePlaylistToDatabase(
-    tracks,
-    intent
-) {
-
-    if (!saveDbBtn) {
-        return;
-    }
-
-
-    saveDbBtn.disabled =
-        true;
-
-
-    saveDbBtn.textContent =
-        "Saving…";
-
-
-    try {
-
-        const client =
-            getSupabaseClient();
-
-
-        const nameInput =
-            document.getElementById(
-                "playlistName"
-            );
-
-
-        const playlistName =
-            nameInput &&
-            nameInput.value.trim()
-                ? nameInput.value.trim()
-                : null;
-
-
-        const {
-            error
-        } =
-            await client
-                .from("generated_playlists")
-                .insert({
-
-                    playlist_name:
-                        playlistName,
-
-                    intent:
-                        intent,
-
-                    track_count:
-                        tracks.length,
-
-                    tracks:
-                        tracks
-
-                });
-
-
-        if (error) {
-            throw error;
-        }
-
-
-        saveDbBtn.textContent =
-            "Saved ✓";
-
-
-        clearError();
-
-
-    } catch (error) {
-
-        console.error(
-            "[GenPlaylist Supabase error]",
-            error
-        );
-
-
-        saveDbBtn.disabled =
-            false;
-
-
-        saveDbBtn.textContent =
-            "Save Playlist";
-
-
-        showError(
-            "Couldn't save your playlist. Please try again.",
-            {
-                retry:
-                    () =>
-                        savePlaylistToDatabase(
-                            tracks,
-                            intent
-                        )
-            }
-        );
-
-    }
-
-}
-
-
-// =====================================================
-// SAVE DATABASE BUTTON
-// =====================================================
-
-if (saveDbBtn) {
-
-    saveDbBtn.addEventListener(
+    saveSpotifyBtn.addEventListener(
         "click",
-        () => {
-
-            const tracks =
-                Array.from(
-                    playlistPreview.querySelectorAll(
-                        ".track"
-                    )
-                ).map(
-                    element => ({
-
-                        title:
-                            element.querySelector(
-                                "h4"
-                            )?.textContent ||
-                            "",
-
-                        artist:
-                            element.querySelector(
-                                "span"
-                            )?.textContent ||
-                            ""
-
-                    })
-                );
-
-
-            if (
-                tracks.length === 0
-            ) {
-
-                showError(
-                    "Generate a playlist first before saving."
-                );
-
-                return;
-
-            }
-
-
-            savePlaylistToDatabase(
-                tracks,
-                selectedIntent
-            );
-
-        }
+        savePlaylistToSpotify
     );
 
 }
 
-
-// =====================================================
-// SAVE GENERATED PLAYLIST TO SPOTIFY
-// =====================================================
 
 async function savePlaylistToSpotify() {
 
@@ -3109,35 +2987,20 @@ async function savePlaylistToSpotify() {
     }
 
 
-    const nameInput =
-        document.getElementById(
-            "playlistName"
-        );
+    const name =
+        playlistNameInput?.value.trim() ||
+        "GenPlaylist Mix";
 
 
-    const playlistName =
-        nameInput &&
-        nameInput.value.trim()
-            ? nameInput.value.trim()
-            : "GenPlaylist Mix";
+    saveSpotifyBtn.disabled =
+        true;
 
 
-    if (saveSpotifyBtn) {
-
-        saveSpotifyBtn.disabled =
-            true;
-
-        saveSpotifyBtn.textContent =
-            "Saving…";
-
-    }
+    saveSpotifyBtn.textContent =
+        "Saving…";
 
 
     try {
-
-        // -----------------------------------------
-        // Get current Spotify user
-        // -----------------------------------------
 
         const currentUser =
             await spotifyFetch(
@@ -3145,46 +3008,32 @@ async function savePlaylistToSpotify() {
             );
 
 
-        // -----------------------------------------
-        // Create playlist
-        // -----------------------------------------
-
-        const createdPlaylist =
+        const playlist =
             await createSpotifyPlaylist(
                 currentUser.id,
-                playlistName
+                name
             );
 
 
-        // -----------------------------------------
-        // Add tracks
-        // -----------------------------------------
-
         await addTracksToSpotifyPlaylist(
-            createdPlaylist.id,
+            playlist.id,
             trackUris
         );
 
 
-        if (saveSpotifyBtn) {
-
-            saveSpotifyBtn.textContent =
-                "Saved to Spotify ✓";
-
-        }
+        saveSpotifyBtn.textContent =
+            "Saved to Spotify ✓";
 
 
         clearError();
 
 
-        // Open playlist
         if (
-            createdPlaylist.external_urls &&
-            createdPlaylist.external_urls.spotify
+            playlist.external_urls?.spotify
         ) {
 
             window.open(
-                createdPlaylist.external_urls.spotify,
+                playlist.external_urls.spotify,
                 "_blank",
                 "noopener,noreferrer"
             );
@@ -3195,20 +3044,17 @@ async function savePlaylistToSpotify() {
     } catch (error) {
 
         console.error(
-            "[GenPlaylist Spotify save error]",
+            "[Spotify save]",
             error
         );
 
 
-        if (saveSpotifyBtn) {
+        saveSpotifyBtn.disabled =
+            false;
 
-            saveSpotifyBtn.disabled =
-                false;
 
-            saveSpotifyBtn.textContent =
-                "Save to Spotify";
-
-        }
+        saveSpotifyBtn.textContent =
+            "Save to Spotify";
 
 
         if (
@@ -3223,22 +3069,8 @@ async function savePlaylistToSpotify() {
         }
 
 
-        if (
-            error.message ===
-            "FORBIDDEN"
-        ) {
-
-            showError(
-                "Spotify denied permission to create playlists. Please reconnect Spotify and approve the playlist permissions."
-            );
-
-            return;
-
-        }
-
-
         showError(
-            "Couldn't save the generated playlist to Spotify. Please try again.",
+            friendlyMessageFor(error),
             {
                 retry:
                     savePlaylistToSpotify
@@ -3256,25 +3088,8 @@ async function savePlaylistToSpotify() {
 
 async function createSpotifyPlaylist(
     userId,
-    playlistName
+    name
 ) {
-
-    const body = {
-
-        name:
-            playlistName,
-
-        public:
-            false,
-
-        collaborative:
-            false,
-
-        description:
-            `Generated by GenPlaylist • ${selectedIntent}`
-
-    };
-
 
     return spotifyFetch(
         "/me/playlists",
@@ -3284,7 +3099,20 @@ async function createSpotifyPlaylist(
                 "POST",
 
             body:
-                JSON.stringify(body)
+                JSON.stringify({
+
+                    name,
+
+                    public:
+                        false,
+
+                    collaborative:
+                        false,
+
+                    description:
+                        `Generated by GenPlaylist • ${selectedIntent}`
+
+                })
 
         }
     );
@@ -3301,7 +3129,8 @@ async function addTracksToSpotifyPlaylist(
     trackUris
 ) {
 
-    const CHUNK_SIZE = 100;
+    const CHUNK_SIZE =
+        100;
 
 
     for (
@@ -3326,7 +3155,10 @@ async function addTracksToSpotifyPlaylist(
 
                 body:
                     JSON.stringify({
-                        uris: chunk
+
+                        uris:
+                            chunk
+
                     })
 
             }
@@ -3338,21 +3170,268 @@ async function addTracksToSpotifyPlaylist(
 
 
 // =====================================================
-// SAVE TO SPOTIFY BUTTON
+// SUPABASE
 // =====================================================
 
-if (saveSpotifyBtn) {
+const SUPABASE_URL =
+    "https://nyxawdoedmqtmtoihsmx.supabase.co";
 
-    saveSpotifyBtn.addEventListener(
+
+const SUPABASE_ANON_KEY =
+    "sb_publishable_vNeLmLSYzA2tgZ3Wz_vX3A_JM5rG_Z3";
+
+
+let supabaseClient =
+    null;
+
+
+function getSupabaseClient() {
+
+    if (supabaseClient) {
+
+        return supabaseClient;
+
+    }
+
+
+    if (
+        !window.supabase ||
+        typeof window.supabase.createClient !==
+            "function"
+    ) {
+
+        throw new Error(
+            "SUPABASE_LIBRARY_MISSING"
+        );
+
+    }
+
+
+    supabaseClient =
+        window.supabase.createClient(
+            SUPABASE_URL,
+            SUPABASE_ANON_KEY
+        );
+
+
+    return supabaseClient;
+
+}
+
+
+// =====================================================
+// SAVE PLAYLIST TO SUPABASE
+// =====================================================
+
+if (saveDbBtn) {
+
+    saveDbBtn.addEventListener(
         "click",
-        savePlaylistToSpotify
+        savePlaylistToDatabase
+    );
+
+}
+
+
+async function savePlaylistToDatabase() {
+
+    const tracks =
+        Array.from(
+            playlistPreview.querySelectorAll(
+                ".track"
+            )
+        ).map(
+            element => ({
+
+                title:
+                    element.querySelector(
+                        "h4"
+                    )?.textContent || "",
+
+                artist:
+                    element.querySelector(
+                        "span"
+                    )?.textContent || ""
+
+            })
+        );
+
+
+    if (
+        tracks.length === 0
+    ) {
+
+        showError(
+            "Generate a playlist first before saving it."
+        );
+
+        return;
+
+    }
+
+
+    if (saveDbBtn) {
+
+        saveDbBtn.disabled =
+            true;
+
+        saveDbBtn.textContent =
+            "Saving…";
+
+    }
+
+
+    try {
+
+        const client =
+            getSupabaseClient();
+
+
+        const {
+            error
+        } =
+            await client
+                .from(
+                    "generated_playlists"
+                )
+                .insert({
+
+                    playlist_name:
+                        playlistNameInput?.value.trim() ||
+                        null,
+
+                    intent:
+                        selectedIntent,
+
+                    track_count:
+                        tracks.length,
+
+                    tracks
+
+                });
+
+
+        if (error) {
+
+            throw error;
+
+        }
+
+
+        saveDbBtn.textContent =
+            "Saved ✓";
+
+
+        clearError();
+
+
+    } catch (error) {
+
+        console.error(
+            "[Supabase]",
+            error
+        );
+
+
+        if (saveDbBtn) {
+
+            saveDbBtn.disabled =
+                false;
+
+            saveDbBtn.textContent =
+                "Save Playlist";
+
+        }
+
+
+        if (
+            error.message ===
+            "SUPABASE_LIBRARY_MISSING"
+        ) {
+
+            showError(
+                "Supabase isn't loaded. Add the Supabase JavaScript library to your HTML."
+            );
+
+            return;
+
+        }
+
+
+        showError(
+            "Couldn't save your playlist. Please try again.",
+            {
+                retry:
+                    savePlaylistToDatabase
+            }
+        );
+
+    }
+
+}
+
+
+// =====================================================
+// AUTH EXPIRED
+// =====================================================
+
+function handleAuthExpired() {
+
+    spotifyAccessToken =
+        null;
+
+
+    sessionStorage.removeItem(
+        "spotify_pkce_verifier"
+    );
+
+
+    setSpotifyDisconnectedState();
+
+
+    hideDashboard();
+
+
+    libraryList.innerHTML =
+        `
+        <p class="placeholder-text">
+            Connect to Spotify to see your playlists here.
+        </p>
+        `;
+
+
+    songGrid.innerHTML =
+        `
+        <p class="placeholder-text">
+            Connect to Spotify to see your top songs here.
+        </p>
+        `;
+
+
+    showError(
+        "Your Spotify session expired. Please reconnect.",
+        {
+            retry:
+                redirectToSpotifyLogin
+        }
     );
 
 }
 
 
 // =====================================================
-// START APPLICATION
+// START APP
 // =====================================================
 
-initSpotifyAuth();
+initialiseSpotifyAuth();
+
+
+// =====================================================
+// INITIAL UI STATE
+// =====================================================
+
+updatePlaylistSizeMode();
+
+setSpotifyDisconnectedState();
+
+hideDashboard();
