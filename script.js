@@ -12,9 +12,6 @@
 const loginButtons =
     document.querySelectorAll("#loginBtn, #heroLoginBtn");
 
-const startBtn =
-    document.getElementById("startBtn");
-
 const generateBtn =
     document.getElementById("generateBtn");
 
@@ -378,25 +375,6 @@ function getSmallestImage(album) {
 
 }
 
-
-function getLargestImage(album) {
-
-    if (
-        !album ||
-        !Array.isArray(album.images) ||
-        album.images.length === 0
-    ) {
-
-        return null;
-
-    }
-
-    return (
-        album.images[0]?.url ||
-        null
-    );
-
-}
 
 
 // =====================================================
@@ -972,6 +950,18 @@ function logoutFromGenPlaylist() {
         "spotify_pkce_verifier"
     );
 
+    // Best-effort: also end the Spotify browser session itself.
+    // An invisible iframe to Spotify's logout page won't work —
+    // accounts.spotify.com sends X-Frame-Options: deny — so a
+    // real new tab is the only reliable way to trigger it. This
+    // app's own logout (above) always succeeds regardless of
+    // whether the user closes that tab or not.
+    window.open(
+        "https://accounts.spotify.com/logout",
+        "_blank",
+        "noopener,noreferrer"
+    );
+
     setSpotifyDisconnectedState();
 
     hideDashboard();
@@ -1281,7 +1271,6 @@ function renderLibraries(
         `
         <input
             type="checkbox"
-            checked
             data-id="liked"
             data-count="${likedCount}"
         >
@@ -1311,7 +1300,6 @@ function renderLibraries(
                 `
                 <input
                     type="checkbox"
-                    checked
                     data-id="${escapeHtml(playlist.id)}"
                     data-count="${escapeHtml(count)}"
                 >
@@ -1695,32 +1683,11 @@ intentionButtons.forEach(
                 );
 
                 selectedIntent =
+                    button.dataset.intent ||
                     button.innerText.trim();
 
             }
         );
-
-    }
-);
-
-
-// =====================================================
-// START BUTTON
-// =====================================================
-
-startBtn?.addEventListener(
-    "click",
-    () => {
-
-        if (spotifyAccessToken) {
-
-            logoutFromGenPlaylist();
-
-        } else {
-
-            redirectToSpotifyLogin();
-
-        }
 
     }
 );
@@ -1849,22 +1816,6 @@ async function generatePlaylist() {
 
     const targetDurationMs =
         getTargetDurationMs();
-
-
-    console.log(
-        "[GenPlaylist] Settings:",
-        {
-            mode:
-                playlistSizeMode,
-
-            targetSize,
-
-            targetDurationMs,
-
-            intent:
-                selectedIntent
-        }
-    );
 
 
     // -----------------------------------------
@@ -2465,11 +2416,6 @@ function scorePool(
 
                 image:
                     getSmallestImage(
-                        track.album
-                    ),
-
-                largeImage:
-                    getLargestImage(
                         track.album
                     ),
 
