@@ -100,6 +100,16 @@
             Connect to Spotify
         </button>
 
+
+        <button
+            id="youtubeLoginBtn"
+            class="youtube-btn"
+            type="button"
+        >
+            <i class="fa-brands fa-youtube"></i>
+            Connect YouTube Music
+        </button>
+
     </nav>
 
 
@@ -116,7 +126,7 @@
 
             <div class="welcome-icon">
 
-                <i class="fa-brands fa-spotify"></i>
+                <i class="fa-solid fa-music"></i>
 
             </div>
 
@@ -127,23 +137,40 @@
 
 
             <p>
-                Connect your Spotify account to build personalised
-                playlists from your own music, listening habits and
-                favourite songs.
+                Connect your desired music platform to build
+                personalised playlists from your own music,
+                listening habits and favourite songs.
             </p>
 
 
-            <button
-                id="heroLoginBtn"
-                class="spotify-btn"
-                type="button"
-            >
+            <div class="hero-platform-buttons">
 
-                <i class="fa-brands fa-spotify"></i>
+                <button
+                    id="heroLoginBtn"
+                    class="spotify-btn"
+                    type="button"
+                >
 
-                Connect to Spotify
+                    <i class="fa-brands fa-spotify"></i>
 
-            </button>
+                    Connect to Spotify
+
+                </button>
+
+
+                <button
+                    id="heroYoutubeLoginBtn"
+                    class="youtube-btn"
+                    type="button"
+                >
+
+                    <i class="fa-brands fa-youtube"></i>
+
+                    Connect YouTube Music
+
+                </button>
+
+            </div>
 
         </div>
 
@@ -613,6 +640,10 @@
     <!-- ==========================================
          JAVASCRIPT
     =========================================== -->
+
+    <!-- Google Identity Services (for YouTube Music integration) -->
+
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 
     <script src="script.js"></script>
 

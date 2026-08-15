@@ -895,6 +895,24 @@ function friendlyMessageFor(error) {
 // LOGIN BUTTON STATE
 // =====================================================
 
+// Applies the active-platform accent theme to <body>, based on
+// whichever platform was most recently connected — not just
+// "is YouTube connected," so switching back to Spotify while
+// YouTube is still connected correctly re-themes to green.
+let lastConnectedPlatform = null;
+
+function applyPlatformTheme() {
+
+    if (lastConnectedPlatform === "youtube") {
+        document.body.classList.add("theme-youtube");
+        return;
+    }
+
+    document.body.classList.remove("theme-youtube");
+
+}
+
+
 function setSpotifyConnectedState() {
 
     loginButtons.forEach(
@@ -912,6 +930,8 @@ function setSpotifyConnectedState() {
 
         }
     );
+
+    applyPlatformTheme();
 
 }
 
@@ -934,6 +954,8 @@ function setSpotifyDisconnectedState() {
         }
     );
 
+    applyPlatformTheme();
+
 }
 
 
@@ -945,6 +967,12 @@ function logoutFromGenPlaylist() {
 
     spotifyAccessToken =
         null;
+
+    if (lastConnectedPlatform === "spotify") {
+        lastConnectedPlatform =
+            youtubeAccessToken ? "youtube" : null;
+        applyPlatformTheme();
+    }
 
     sessionStorage.removeItem(
         "spotify_pkce_verifier"
@@ -1088,6 +1116,8 @@ async function initialiseSpotifyAuth() {
         await exchangeCodeForToken(
             code
         );
+
+        lastConnectedPlatform = "spotify";
 
         setSpotifyConnectedState();
 
@@ -3763,6 +3793,304 @@ setSpotifyDisconnectedState();
 hideDashboard();
 
 updatePlaylistSizeMode();
+
+
+// =====================================================
+// YOUTUBE MUSIC AUTH
+// =====================================================
+// Uses Google Identity Services (a popup-based token flow) —
+// architecturally different from Spotify's redirect-based PKCE
+// flow above, since that's how Google's browser auth works.
+//
+// SETUP NEEDED before this works:
+// 1. Create a project in Google Cloud Console, enable
+//    "YouTube Data API v3".
+// 2. Configure the OAuth consent screen (scopes below).
+// 3. Create an OAuth Client ID (Web application), add this
+//    page's exact origin as an Authorized JavaScript origin.
+// 4. Add testers by email under "Test users" while in
+//    Testing mode (up to ~100).
+
+const YOUTUBE_CLIENT_ID =
+    "PASTE_YOUR_GOOGLE_OAUTH_CLIENT_ID_HERE";
+
+const YOUTUBE_SCOPES =
+    "https://www.googleapis.com/auth/youtube.readonly";
+
+const youtubeLoginButtons =
+    document.querySelectorAll("#youtubeLoginBtn, #heroYoutubeLoginBtn");
+
+let youtubeAccessToken = null;
+let youtubeTokenClient = null;
+
+
+function getYoutubeTokenClient() {
+
+    if (youtubeTokenClient) {
+        return youtubeTokenClient;
+    }
+
+    const PLACEHOLDER_YOUTUBE_CLIENT_ID =
+        "PASTE_YOUR_GOOGLE_OAUTH_CLIENT_ID_HERE";
+
+    if (
+        !YOUTUBE_CLIENT_ID ||
+        YOUTUBE_CLIENT_ID === PLACEHOLDER_YOUTUBE_CLIENT_ID
+    ) {
+        throw new Error("YOUTUBE_NOT_CONFIGURED");
+    }
+
+    if (
+        !window.google ||
+        !window.google.accounts ||
+        !window.google.accounts.oauth2
+    ) {
+        throw new Error("YOUTUBE_LIBRARY_MISSING");
+    }
+
+    youtubeTokenClient =
+        window.google.accounts.oauth2.initTokenClient({
+            client_id: YOUTUBE_CLIENT_ID,
+            scope: YOUTUBE_SCOPES,
+            callback: (response) => {
+
+                if (response.error) {
+                    showError(
+                        `YouTube sign-in was cancelled or denied (${response.error}).`
+                    );
+                    return;
+                }
+
+                youtubeAccessToken = response.access_token;
+                lastConnectedPlatform = "youtube";
+                setYoutubeConnectedState();
+                applyPlatformTheme();
+                clearError();
+
+                // Proof-of-connection: confirms the token actually
+                // works before any generation-engine wiring exists.
+                fetchYoutubePlaylistsPreview();
+
+            }
+        });
+
+    return youtubeTokenClient;
+
+}
+
+
+function connectYoutube() {
+
+    try {
+
+        const client = getYoutubeTokenClient();
+
+        client.requestAccessToken();
+
+    } catch (err) {
+
+        if (err.message === "YOUTUBE_NOT_CONFIGURED") {
+            showError(
+                "No Google OAuth Client ID is set. Add yours near the top of script.js before connecting YouTube."
+            );
+            return;
+        }
+
+        if (err.message === "YOUTUBE_LIBRARY_MISSING") {
+            showError(
+                "Google's sign-in library hasn't loaded yet. Please wait a moment and try again."
+            );
+            return;
+        }
+
+        showError(
+            "Couldn't start YouTube sign-in. Please try again.",
+            { retry: connectYoutube }
+        );
+
+    }
+
+}
+
+
+function setYoutubeConnectedState() {
+
+    youtubeLoginButtons.forEach(
+        button => {
+
+            button.textContent = "YouTube Connected ✓";
+            button.classList.add("logout-state");
+
+        }
+    );
+
+}
+
+
+function setYoutubeDisconnectedState() {
+
+    youtubeLoginButtons.forEach(
+        button => {
+
+            button.innerHTML =
+                `<i class="fa-brands fa-youtube"></i> Connect YouTube Music`;
+            button.classList.remove("logout-state");
+
+        }
+    );
+
+}
+
+
+// Resilient fetch wrapper for the YouTube Data API, matching the
+// same retry/backoff shape as spotifyFetch — including handling
+// quota exhaustion (403 quotaExceeded) as its own clear error,
+// since that's a real, expected failure mode for this API.
+async function youtubeFetch(path, attempt = 1) {
+
+    let res;
+
+    try {
+
+        res = await fetch(
+            `https://www.googleapis.com/youtube/v3${path}`,
+            {
+                headers: {
+                    Authorization: `Bearer ${youtubeAccessToken}`
+                }
+            }
+        );
+
+    } catch (networkErr) {
+
+        if (attempt <= 3) {
+            await sleep(500 * attempt);
+            return youtubeFetch(path, attempt + 1);
+        }
+
+        throw new Error("NETWORK_ERROR");
+
+    }
+
+    if (res.status >= 500 && attempt <= 3) {
+        await sleep(400 * attempt);
+        return youtubeFetch(path, attempt + 1);
+    }
+
+    if (res.status === 401) {
+        throw new Error("YOUTUBE_AUTH_EXPIRED");
+    }
+
+    if (res.status === 403) {
+
+        const body =
+            await res.json().catch(() => null);
+
+        const reason =
+            body?.error?.errors?.[0]?.reason ||
+            "";
+
+        if (reason === "quotaExceeded") {
+            throw new Error("YOUTUBE_QUOTA_EXCEEDED");
+        }
+
+        throw new Error("FORBIDDEN");
+
+    }
+
+    if (!res.ok) {
+        throw new Error(`YOUTUBE_ERROR_${res.status}`);
+    }
+
+    return res.json();
+
+}
+
+
+function friendlyYoutubeMessageFor(err) {
+
+    switch (err && err.message) {
+
+        case "NETWORK_ERROR":
+            return "Couldn't reach YouTube. Check your connection and try again.";
+
+        case "YOUTUBE_AUTH_EXPIRED":
+            return "Your YouTube session expired. Please reconnect.";
+
+        case "YOUTUBE_QUOTA_EXCEEDED":
+            return "YouTube's daily API quota has been used up for today. Please try again tomorrow.";
+
+        case "FORBIDDEN":
+            return "YouTube denied that request — a scope may be missing, or this app isn't verified for that action yet.";
+
+        default:
+            return "Something went wrong talking to YouTube. Please try again.";
+
+    }
+
+}
+
+
+// Temporary proof-of-connection check — lists the user's real
+// playlists and logs them, so we can confirm the whole auth
+// chain actually works before building the real UI for it.
+async function fetchYoutubePlaylistsPreview() {
+
+    try {
+
+        const data = await youtubeFetch(
+            "/playlists?part=snippet,contentDetails&mine=true&maxResults=25"
+        );
+
+        console.log(
+            "[GenPlaylist] YouTube playlists:",
+            data.items
+        );
+
+    } catch (err) {
+
+        if (err.message === "YOUTUBE_AUTH_EXPIRED") {
+            youtubeAccessToken = null;
+            setYoutubeDisconnectedState();
+        }
+
+        showError(
+            friendlyYoutubeMessageFor(err),
+            { retry: fetchYoutubePlaylistsPreview }
+        );
+
+    }
+
+}
+
+
+youtubeLoginButtons.forEach(
+    button => button.addEventListener(
+        "click",
+        () => {
+
+            if (youtubeAccessToken) {
+                youtubeAccessToken = null;
+
+                if (lastConnectedPlatform === "youtube") {
+                    lastConnectedPlatform =
+                        spotifyAccessToken ? "spotify" : null;
+                    applyPlatformTheme();
+                }
+
+                setYoutubeDisconnectedState();
+                clearError();
+                return;
+            }
+
+            connectYoutube();
+
+        }
+    )
+);
+
+
+setYoutubeDisconnectedState();
 
 
 // =====================================================
