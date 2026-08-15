@@ -156,7 +156,7 @@ a {
    NAVIGATION
 ========================================== */
 
-nav {
+/* nav {
 
     width: 100%;
 
@@ -191,8 +191,26 @@ nav {
 
     gap: 12px;
 
+} */
+
+nav {
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 12px;
+    padding: 20px 60px;
+    background: rgba(18,18,18,0.95);
+    position: sticky;
+    top: 0;
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    z-index: 999;
 }
 
+.logo {
+    margin-right: auto;
+}
 
 .logo i {
 
