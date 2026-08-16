@@ -54,6 +54,9 @@ const saveDbBtn =
 const saveSpotifyBtn =
     document.getElementById("saveSpotifyBtn");
 
+const historySaveSpotifyBtn =
+    document.getElementById("historySaveSpotifyBtn");
+
 const viewHistoryBtn =
     document.getElementById("viewHistoryBtn");
 
@@ -3314,17 +3317,232 @@ function createTrackElement(
 }
 
 
+// // =====================================================
+// // SAVE TO SPOTIFY
+// // =====================================================
+
+// saveSpotifyBtn?.addEventListener(
+//     "click",
+//     savePlaylistToSpotify
+// );
+
+
+// async function savePlaylistToSpotify() {
+
+//     if (!spotifyAccessToken) {
+
+//         showError(
+//             "Connect your Spotify account first."
+//         );
+
+//         return;
+
+//     }
+
+
+//     if (!playlistPreview) {
+
+//         showError(
+//             "Generate a playlist first before saving it to Spotify."
+//         );
+
+//         return;
+
+//     }
+
+
+//     const tracks =
+//         Array.from(
+//             playlistPreview.querySelectorAll(
+//                 ".track"
+//             )
+//         );
+
+
+//     if (
+//         tracks.length === 0
+//     ) {
+
+//         showError(
+//             "Generate a playlist first before saving it to Spotify."
+//         );
+
+//         return;
+
+//     }
+
+
+//     const trackUris =
+//         tracks
+//             .map(
+//                 track =>
+//                     track.dataset.uri
+//             )
+//             .filter(
+//                 uri =>
+//                     uri &&
+//                     uri.startsWith(
+//                         "spotify:track:"
+//                     )
+//             );
+
+
+//     if (
+//         trackUris.length === 0
+//     ) {
+
+//         showError(
+//             "The generated playlist doesn't contain any valid Spotify tracks."
+//         );
+
+//         return;
+
+//     }
+
+
+//     const name =
+//         playlistNameInput?.value.trim() ||
+//         "GenPlaylist Mix";
+
+
+//     saveSpotifyBtn.disabled =
+//         true;
+
+//     saveSpotifyBtn.textContent =
+//         "Saving…";
+
+
+//     try {
+
+//         const currentUser =
+//             await spotifyFetch(
+//                 "/me"
+//             );
+
+
+//         const playlist =
+//             await createSpotifyPlaylist(
+//                 currentUser.id,
+//                 name
+//             );
+
+
+//         await addTracksToSpotifyPlaylist(
+//             playlist.id,
+//             trackUris
+//         );
+
+
+//         saveSpotifyBtn.textContent =
+//             "Saved to Spotify ✓";
+
+
+//         clearError();
+
+
+//         if (
+//             playlist.external_urls?.spotify
+//         ) {
+
+//             window.open(
+//                 playlist.external_urls.spotify,
+//                 "_blank",
+//                 "noopener,noreferrer"
+//             );
+
+//         }
+
+//     } catch (error) {
+
+//         console.error(
+//             "[Spotify save]",
+//             error
+//         );
+
+
+//         saveSpotifyBtn.disabled =
+//             false;
+
+//         saveSpotifyBtn.textContent =
+//             "Save to Spotify";
+
+
+//         if (
+//             error.message ===
+//             "AUTH_EXPIRED"
+//         ) {
+
+//             handleAuthExpired();
+
+//             return;
+
+//         }
+
+
+//         showError(
+//             friendlyMessageFor(error),
+//             {
+//                 retry:
+//                     savePlaylistToSpotify
+//             }
+//         );
+
+//     }
+
+// }
+
 // =====================================================
 // SAVE TO SPOTIFY
+// =====================================================
+//
+// Supports both:
+//
+// 1. The currently generated playlist
+// 2. A playlist loaded from Supabase history
+//
+// The existing Save to Spotify button continues to work
+// for newly generated playlists.
+// The separate history button uses the same save function
+// but receives the historical playlist data.
 // =====================================================
 
 saveSpotifyBtn?.addEventListener(
     "click",
-    savePlaylistToSpotify
+    () => savePlaylistToSpotify()
 );
 
 
-async function savePlaylistToSpotify() {
+historySaveSpotifyBtn?.addEventListener(
+    "click",
+    () => {
+
+        if (!currentHistoryRow) {
+
+            showError(
+                "Select a playlist from your history first."
+            );
+
+            return;
+
+        }
+
+        savePlaylistToSpotify(
+            currentHistoryRow,
+            historySaveSpotifyBtn
+        );
+
+    }
+);
+
+
+let currentHistoryRow =
+    null;
+
+
+async function savePlaylistToSpotify(
+    historyRow = null,
+    button = saveSpotifyBtn
+) {
 
     if (!spotifyAccessToken) {
 
@@ -3337,59 +3555,134 @@ async function savePlaylistToSpotify() {
     }
 
 
-    if (!playlistPreview) {
+    // -----------------------------------------
+    // GET TRACK URIS
+    // -----------------------------------------
+    //
+    // Historical playlist:
+    // use the tracks stored in Supabase.
+    //
+    // New playlist:
+    // use the tracks currently displayed
+    // in playlistPreview.
+    //
+    // -----------------------------------------
 
-        showError(
-            "Generate a playlist first before saving it to Spotify."
-        );
-
-        return;
-
-    }
-
-
-    const tracks =
-        Array.from(
-            playlistPreview.querySelectorAll(
-                ".track"
-            )
-        );
+    let trackUris = [];
+    let name = "GenPlaylist Mix";
 
 
-    if (
-        tracks.length === 0
-    ) {
+    if (historyRow) {
 
-        showError(
-            "Generate a playlist first before saving it to Spotify."
-        );
-
-        return;
-
-    }
+        const historicalTracks =
+            Array.isArray(historyRow.tracks)
+                ? historyRow.tracks
+                : [];
 
 
-    const trackUris =
-        tracks
-            .map(
-                track =>
-                    track.dataset.uri
-            )
-            .filter(
-                uri =>
-                    uri &&
-                    uri.startsWith(
-                        "spotify:track:"
-                    )
+        if (
+            historicalTracks.length === 0
+        ) {
+
+            showError(
+                "This saved playlist doesn't contain any tracks."
             );
 
+            return;
+
+        }
+
+
+        trackUris =
+            historicalTracks
+                .map(
+                    track =>
+                        track.uri
+                )
+                .filter(
+                    uri =>
+                        uri &&
+                        uri.startsWith(
+                            "spotify:track:"
+                        )
+                );
+
+
+        name =
+            historyRow.playlist_name?.trim() ||
+            "GenPlaylist Mix";
+
+    }
+
+
+    else {
+
+        if (!playlistPreview) {
+
+            showError(
+                "Generate a playlist first before saving it to Spotify."
+            );
+
+            return;
+
+        }
+
+
+        const tracks =
+            Array.from(
+                playlistPreview.querySelectorAll(
+                    ".track"
+                )
+            );
+
+
+        if (
+            tracks.length === 0
+        ) {
+
+            showError(
+                "Generate a playlist first before saving it to Spotify."
+            );
+
+            return;
+
+        }
+
+
+        trackUris =
+            tracks
+                .map(
+                    track =>
+                        track.dataset.uri
+                )
+                .filter(
+                    uri =>
+                        uri &&
+                        uri.startsWith(
+                            "spotify:track:"
+                        )
+                );
+
+
+        name =
+            playlistNameInput?.value.trim() ||
+            "GenPlaylist Mix";
+
+    }
+
+
+    // -----------------------------------------
+    // VALIDATE TRACKS
+    // -----------------------------------------
 
     if (
         trackUris.length === 0
     ) {
 
         showError(
-            "The generated playlist doesn't contain any valid Spotify tracks."
+            historyRow
+                ? "This saved playlist doesn't contain any valid Spotify tracks."
+                : "The generated playlist doesn't contain any valid Spotify tracks."
         );
 
         return;
@@ -3397,16 +3690,19 @@ async function savePlaylistToSpotify() {
     }
 
 
-    const name =
-        playlistNameInput?.value.trim() ||
-        "GenPlaylist Mix";
+    // -----------------------------------------
+    // BUTTON STATE
+    // -----------------------------------------
 
+    if (button) {
 
-    saveSpotifyBtn.disabled =
-        true;
+        button.disabled =
+            true;
 
-    saveSpotifyBtn.textContent =
-        "Saving…";
+        button.textContent =
+            "Saving…";
+
+    }
 
 
     try {
@@ -3430,8 +3726,12 @@ async function savePlaylistToSpotify() {
         );
 
 
-        saveSpotifyBtn.textContent =
-            "Saved to Spotify ✓";
+        if (button) {
+
+            button.textContent =
+                "Saved to Spotify ✓";
+
+        }
 
 
         clearError();
@@ -3457,11 +3757,15 @@ async function savePlaylistToSpotify() {
         );
 
 
-        saveSpotifyBtn.disabled =
-            false;
+        if (button) {
 
-        saveSpotifyBtn.textContent =
-            "Save to Spotify";
+            button.disabled =
+                false;
+
+            button.textContent =
+                "Save to Spotify";
+
+        }
 
 
         if (
@@ -3480,7 +3784,11 @@ async function savePlaylistToSpotify() {
             friendlyMessageFor(error),
             {
                 retry:
-                    savePlaylistToSpotify
+                    () =>
+                        savePlaylistToSpotify(
+                            historyRow,
+                            button
+                        )
             }
         );
 
@@ -3931,30 +4239,87 @@ function renderHistoryList(rows) {
 }
 
 
+// function viewHistoryEntry(row) {
+
+//     historyTrackViewTitle.textContent =
+//         row.playlist_name || "Untitled Playlist";
+
+//     historyTrackList.innerHTML = "";
+
+//     // Saved tracks don't carry their own tag/image — reuse the
+//     // playlist's own saved intent as the tag instead of falling
+//     // back to createTrackElement's default (today's live
+//     // selectedIntent), which would be misleading for old data.
+//     (row.tracks || []).forEach(track => {
+
+//         historyTrackList.appendChild(
+//             createTrackElement({
+//                 ...track,
+//                 tag: row.intent
+//             })
+//         );
+
+//     });
+
+//     historyList.classList.add("hidden");
+//     historyTrackView.classList.remove("hidden");
+
+// }
+
 function viewHistoryEntry(row) {
+
+    currentHistoryRow =
+        row;
+
 
     historyTrackViewTitle.textContent =
         row.playlist_name || "Untitled Playlist";
 
+
     historyTrackList.innerHTML = "";
+
+
+    // Reset the history Spotify button whenever
+    // a different historical playlist is opened.
+
+    if (historySaveSpotifyBtn) {
+
+        historySaveSpotifyBtn.disabled =
+            false;
+
+        historySaveSpotifyBtn.textContent =
+            "Save to Spotify";
+
+    }
+
 
     // Saved tracks don't carry their own tag/image — reuse the
     // playlist's own saved intent as the tag instead of falling
     // back to createTrackElement's default (today's live
     // selectedIntent), which would be misleading for old data.
-    (row.tracks || []).forEach(track => {
 
-        historyTrackList.appendChild(
-            createTrackElement({
-                ...track,
-                tag: row.intent
-            })
-        );
+    (row.tracks || []).forEach(
+        track => {
 
-    });
+            historyTrackList.appendChild(
+                createTrackElement({
+                    ...track,
+                    tag: row.intent
+                })
+            );
 
-    historyList.classList.add("hidden");
-    historyTrackView.classList.remove("hidden");
+        }
+    );
+
+
+    historyList.classList.add(
+        "hidden"
+    );
+
+
+    historyTrackView.classList.remove(
+        "hidden"
+    );
 
 }
 

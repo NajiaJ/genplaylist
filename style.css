@@ -509,6 +509,14 @@ button:active {
 
 }
 
+.history-track-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    margin-bottom: 16px;
+}
 
 .history-track-view {
 
