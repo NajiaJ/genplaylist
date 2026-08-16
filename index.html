@@ -188,6 +188,90 @@
 
 
         <!-- ======================================
+             PLAYLIST HISTORY
+        ======================================= -->
+
+        <section class="history-bar">
+
+            <button
+                type="button"
+                id="viewHistoryBtn"
+                class="secondary-btn"
+            >
+                <i class="fa-regular fa-clock-rotate-left"></i>
+                View Playlist History
+            </button>
+
+        </section>
+
+
+        <section
+            id="historyPanel"
+            class="card history-panel hidden"
+        >
+
+            <div class="section-heading">
+
+                <div>
+
+                    <h2>
+                        <i class="fa-regular fa-clock-rotate-left"></i>
+                        Playlist History
+                    </h2>
+
+                    <p>
+                        Playlists you've previously saved.
+                    </p>
+
+                </div>
+
+
+                <button
+                    type="button"
+                    id="closeHistoryBtn"
+                    class="secondary-btn"
+                >
+                    Close
+                </button>
+
+            </div>
+
+
+            <div id="historyList" class="history-list">
+
+                <p class="placeholder-text">
+                    Loading your playlist history…
+                </p>
+
+            </div>
+
+
+            <div
+                id="historyTrackView"
+                class="history-track-view hidden"
+            >
+
+                <button
+                    type="button"
+                    id="backToHistoryListBtn"
+                    class="secondary-btn"
+                >
+                    ← Back to history
+                </button>
+
+                <h3 id="historyTrackViewTitle"></h3>
+
+                <div
+                    id="historyTrackList"
+                    class="playlist-preview"
+                ></div>
+
+            </div>
+
+        </section>
+
+
+        <!-- ======================================
              LIBRARIES
         ======================================= -->
 

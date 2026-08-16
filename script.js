@@ -54,6 +54,30 @@ const saveDbBtn =
 const saveSpotifyBtn =
     document.getElementById("saveSpotifyBtn");
 
+const viewHistoryBtn =
+    document.getElementById("viewHistoryBtn");
+
+const closeHistoryBtn =
+    document.getElementById("closeHistoryBtn");
+
+const historyPanel =
+    document.getElementById("historyPanel");
+
+const historyList =
+    document.getElementById("historyList");
+
+const historyTrackView =
+    document.getElementById("historyTrackView");
+
+const historyTrackList =
+    document.getElementById("historyTrackList");
+
+const historyTrackViewTitle =
+    document.getElementById("historyTrackViewTitle");
+
+const backToHistoryListBtn =
+    document.getElementById("backToHistoryListBtn");
+
 const selectAllBtn =
     document.getElementById("selectAllPlaylists");
 
@@ -95,6 +119,9 @@ let selectedIntent =
     "Current Favourites";
 
 let spotifyAccessToken =
+    null;
+
+let spotifyUserId =
     null;
 
 let playlistSizeMode =
@@ -968,6 +995,11 @@ function logoutFromGenPlaylist() {
     spotifyAccessToken =
         null;
 
+    spotifyUserId =
+        null;
+
+    hidePlaylistHistory();
+
     if (lastConnectedPlatform === "spotify") {
         lastConnectedPlatform =
             youtubeAccessToken ? "youtube" : null;
@@ -1124,6 +1156,16 @@ async function initialiseSpotifyAuth() {
         showDashboard();
 
         clearError();
+
+        try {
+            const me = await spotifyFetch("/me");
+            spotifyUserId = me.id;
+        } catch (idError) {
+            // Non-fatal — the rest of the app still works without
+            // this; only "Save Playlist" and "View Playlist
+            // History" need it, and each handles it missing.
+            spotifyUserId = null;
+        }
 
         await loadLibrariesAndAnchors();
 
@@ -3673,6 +3715,9 @@ async function savePlaylistToDatabase() {
                     track_count:
                         tracks.length,
 
+                    spotify_user_id:
+                        spotifyUserId,
+
                     tracks
 
                 });
@@ -3732,6 +3777,218 @@ async function savePlaylistToDatabase() {
 
 
 // =====================================================
+// PLAYLIST HISTORY
+// =====================================================
+// Filtered by spotify_user_id at the query level, so each user
+// only sees their own saved playlists in the app's UI. Worth
+// knowing: this is an app-level filter, not a security boundary
+// — the current RLS policy still permits any anon key holder to
+// query the table directly. Real per-user isolation would need
+// Supabase Auth + RLS tied to auth.uid(), which is a bigger
+// change than what was asked for here.
+
+async function loadPlaylistHistory() {
+
+    if (!spotifyUserId) {
+
+        historyList.innerHTML =
+            `
+            <p class="placeholder-text">
+                Connect Spotify to view your playlist history.
+            </p>
+            `;
+
+        return;
+
+    }
+
+    historyList.innerHTML =
+        `
+        <p class="placeholder-text">
+            Loading your playlist history…
+        </p>
+        `;
+
+    try {
+
+        const client =
+            getSupabaseClient();
+
+        const {
+            data,
+            error
+        } =
+            await client
+                .from("generated_playlists")
+                .select("*")
+                .eq("spotify_user_id", spotifyUserId)
+                .order("created_at", { ascending: false })
+                .limit(50);
+
+        if (error) {
+            throw error;
+        }
+
+        renderHistoryList(data || []);
+
+    } catch (error) {
+
+        console.error(
+            "[Supabase history]",
+            error
+        );
+
+        if (error.message === "SUPABASE_LIBRARY_MISSING") {
+
+            historyList.innerHTML =
+                `
+                <p class="placeholder-text">
+                    Supabase isn't loaded. Add the Supabase JavaScript library to your HTML.
+                </p>
+                `;
+
+            return;
+
+        }
+
+        historyList.innerHTML =
+            `
+            <p class="placeholder-text">
+                Couldn't load your playlist history.
+            </p>
+            `;
+
+        showError(
+            "Couldn't load your playlist history. Please try again.",
+            { retry: loadPlaylistHistory }
+        );
+
+    }
+
+}
+
+
+function renderHistoryList(rows) {
+
+    if (rows.length === 0) {
+
+        historyList.innerHTML =
+            `
+            <p class="placeholder-text">
+                You haven't saved any playlists yet.
+            </p>
+            `;
+
+        return;
+
+    }
+
+    historyList.innerHTML = "";
+
+    rows.forEach(row => {
+
+        const item =
+            document.createElement("div");
+
+        item.className = "history-item";
+
+        const dateLabel =
+            new Date(row.created_at).toLocaleDateString(
+                undefined,
+                { month: "short", day: "numeric", year: "numeric" }
+            );
+
+        item.innerHTML =
+            `
+            <div>
+                <div class="history-item-name">
+                    ${escapeHtml(row.playlist_name || "Untitled Playlist")}
+                </div>
+                <div class="history-item-meta">
+                    ${escapeHtml(row.intent)} · ${escapeHtml(row.track_count)} songs · ${escapeHtml(dateLabel)}
+                </div>
+            </div>
+            <i class="fa-solid fa-chevron-right"></i>
+            `;
+
+        item.addEventListener(
+            "click",
+            () => viewHistoryEntry(row)
+        );
+
+        historyList.appendChild(item);
+
+    });
+
+}
+
+
+function viewHistoryEntry(row) {
+
+    historyTrackViewTitle.textContent =
+        row.playlist_name || "Untitled Playlist";
+
+    historyTrackList.innerHTML = "";
+
+    // Saved tracks don't carry their own tag/image — reuse the
+    // playlist's own saved intent as the tag instead of falling
+    // back to createTrackElement's default (today's live
+    // selectedIntent), which would be misleading for old data.
+    (row.tracks || []).forEach(track => {
+
+        historyTrackList.appendChild(
+            createTrackElement({
+                ...track,
+                tag: row.intent
+            })
+        );
+
+    });
+
+    historyList.classList.add("hidden");
+    historyTrackView.classList.remove("hidden");
+
+}
+
+
+function showPlaylistHistory() {
+
+    historyPanel.classList.remove("hidden");
+    historyTrackView.classList.add("hidden");
+    historyList.classList.remove("hidden");
+
+    loadPlaylistHistory();
+
+}
+
+
+function hidePlaylistHistory() {
+
+    historyPanel?.classList.add("hidden");
+
+}
+
+
+viewHistoryBtn?.addEventListener(
+    "click",
+    showPlaylistHistory
+);
+
+closeHistoryBtn?.addEventListener(
+    "click",
+    hidePlaylistHistory
+);
+
+backToHistoryListBtn?.addEventListener(
+    "click",
+    () => {
+        historyTrackView.classList.add("hidden");
+        historyList.classList.remove("hidden");
+    }
+);
+
+
+// =====================================================
 // AUTH EXPIRED
 // =====================================================
 
@@ -3739,6 +3996,11 @@ function handleAuthExpired() {
 
     spotifyAccessToken =
         null;
+
+    spotifyUserId =
+        null;
+
+    hidePlaylistHistory();
 
     sessionStorage.removeItem(
         "spotify_pkce_verifier"
