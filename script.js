@@ -28,7 +28,7 @@ const resultSection =
     document.getElementById("result");
 
 const playlistPreview =
-    document.querySelector(".playlist-preview");
+    document.getElementById("playlistPreview");
 
 const libraryList =
     document.getElementById("libraryList");
@@ -3235,6 +3235,10 @@ function createTrackElement(
         track.duration_ms || 0;
 
 
+    container.dataset.image =
+        track.image || "";
+
+
     const albumArt =
         track.image
             ? `
@@ -3664,7 +3668,11 @@ async function savePlaylistToDatabase() {
                         element.dataset.duration ||
                         "0",
                         10
-                    )
+                    ),
+
+                image:
+                    element.dataset.image ||
+                    null
 
             })
         );
