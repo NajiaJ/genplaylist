@@ -5282,26 +5282,80 @@ youtubeLoginButtons.forEach(
         "click",
         () => {
 
+            // ------------------------------------------
+            // YouTube is currently connected
+            // ------------------------------------------
+
             if (youtubeAccessToken) {
+
+                // Immediately disconnect YouTube
                 youtubeAccessToken = null;
 
-                if (lastConnectedPlatform === "youtube") {
+                // Update the YouTube buttons immediately
+                setYoutubeDisconnectedState();
+
+
+                // ------------------------------------------
+                // Spotify is still connected
+                // ------------------------------------------
+
+                if (spotifyAccessToken) {
+
+                    // Switch back to Spotify if YouTube
+                    // was the active platform.
+                    if (
+                        activeLibrarySource ===
+                        "youtube"
+                    ) {
+                        setActiveLibrarySource(
+                            "spotify"
+                        );
+                    }
+
                     lastConnectedPlatform =
-                        spotifyAccessToken ? "spotify" : null;
+                        "spotify";
+
                     applyPlatformTheme();
+
+                    updateLibrarySourceBar();
+                    updateHistoryPlatformTabs();
+
+                    showDashboard();
+
+                    clearError();
+
+                    return;
                 }
+
+
+                // ------------------------------------------
+                // Neither platform is connected
+                // ------------------------------------------
+
+                activeLibrarySource =
+                    "spotify";
+
+                lastConnectedPlatform =
+                    null;
+
+                applyPlatformTheme();
 
                 updateLibrarySourceBar();
                 updateHistoryPlatformTabs();
 
-                if (activeLibrarySource === "youtube" && spotifyAccessToken) {
-                    setActiveLibrarySource("spotify");
-                }
+                // This hides the dashboard AND
+                // shows the hero landing page.
+                hideDashboard();
 
-                setYoutubeDisconnectedState();
                 clearError();
+
                 return;
             }
+
+
+            // ------------------------------------------
+            // YouTube is not connected
+            // ------------------------------------------
 
             connectYoutube();
 
