@@ -3999,31 +3999,69 @@ async function createYoutubePlaylist(
 
 async function addVideosToYoutubePlaylist(playlistId, videoIds) {
 
-    for (const videoId of videoIds) {
+    const uniqueVideoIds = [
+        ...new Set(
+            videoIds.filter(Boolean)
+        )
+    ];
 
-        await youtubeFetch(
-            "/playlistItems?part=snippet",
-            {
+    let added = 0;
+    let skipped = 0;
 
-                method: "POST",
+    for (const videoId of uniqueVideoIds) {
 
-                body: JSON.stringify({
+        try {
 
-                    snippet: {
-                        playlistId,
-                        resourceId: {
-                            kind: "youtube#video",
-                            videoId
+            await youtubeFetch(
+                "/playlistItems?part=snippet",
+                {
+                    method: "POST",
+
+                    body: JSON.stringify({
+                        snippet: {
+                            playlistId,
+                            resourceId: {
+                                kind: "youtube#video",
+                                videoId
+                            }
                         }
-                    }
+                    })
+                }
+            );
 
-                })
+            added++;
 
-            }
-        );
+        } catch (error) {
 
+            console.warn(
+                "[YouTube] Could not add video:",
+                videoId,
+                error
+            );
+
+            skipped++;
+        }
     }
 
+    console.log(
+        `[YouTube] Playlist population complete: ${added} added, ${skipped} skipped.`
+    );
+
+    // Only fail the overall save if literally nothing
+    // could be added.
+    if (
+        added === 0 &&
+        uniqueVideoIds.length > 0
+    ) {
+        throw new Error(
+            "YOUTUBE_NO_VIDEOS_ADDED"
+        );
+    }
+
+    return {
+        added,
+        skipped
+    };
 }
 
 
