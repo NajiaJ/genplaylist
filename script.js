@@ -1127,7 +1127,8 @@ function logoutFromGenPlaylist() {
 
 
     // If YouTube Music is still connected,
-    // keep the dashboard available.
+    // switch the app to YouTube instead of
+    // hiding the dashboard.
     if (youtubeAccessToken) {
 
         if (
@@ -1147,7 +1148,18 @@ function logoutFromGenPlaylist() {
         updateLibrarySourceBar();
         updateHistoryPlatformTabs();
 
+        // IMPORTANT:
+        // Update Spotify buttons even though
+        // YouTube remains connected.
+        setSpotifyDisconnectedState();
+
+        // Keep dashboard visible.
         showDashboard();
+
+        // Clear Spotify PKCE state.
+        sessionStorage.removeItem(
+            "spotify_pkce_verifier"
+        );
 
         clearError();
 
@@ -1155,7 +1167,7 @@ function logoutFromGenPlaylist() {
     }
 
 
-    // Neither platform is connected.
+    // No other platform is connected.
     lastConnectedPlatform =
         null;
 
@@ -1164,6 +1176,27 @@ function logoutFromGenPlaylist() {
     updateLibrarySourceBar();
     updateHistoryPlatformTabs();
 
+
+    // Clear Spotify PKCE state.
+    sessionStorage.removeItem(
+        "spotify_pkce_verifier"
+    );
+
+
+    // Best-effort Spotify browser logout.
+    window.open(
+        "https://accounts.spotify.com/logout",
+        "_blank",
+        "noopener,noreferrer"
+    );
+
+
+    // Reset the Spotify buttons.
+    setSpotifyDisconnectedState();
+
+
+    // Nothing else is connected,
+    // so hide the dashboard.
     hideDashboard();
 
 
