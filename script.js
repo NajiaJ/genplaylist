@@ -1117,49 +1117,37 @@ function setSpotifyDisconnectedState() {
 
 function logoutFromGenPlaylist() {
 
-    spotifyAccessToken =
-        null;
+    // ------------------------------------------
+    // 1. Immediately disconnect Spotify
+    // ------------------------------------------
 
-    spotifyUserId =
-        null;
+    spotifyAccessToken = null;
+    spotifyUserId = null;
 
-    hidePlaylistHistory();
+    sessionStorage.removeItem(
+        "spotify_pkce_verifier"
+    );
+
+    // Immediately change the Spotify buttons
+    // back to "Connect to Spotify".
+    setSpotifyDisconnectedState();
 
 
-    // If YouTube Music is still connected,
-    // switch the app to YouTube instead of
-    // hiding the dashboard.
+    // ------------------------------------------
+    // 2. If YouTube is still connected,
+    //    keep the dashboard open.
+    // ------------------------------------------
+
     if (youtubeAccessToken) {
 
-        if (
-            activeLibrarySource ===
-            "spotify"
-        ) {
-            setActiveLibrarySource(
-                "youtube"
-            );
+        if (activeLibrarySource === "spotify") {
+            activeLibrarySource = "youtube";
         }
-
-        lastConnectedPlatform =
-            "youtube";
-
-        applyPlatformTheme();
 
         updateLibrarySourceBar();
         updateHistoryPlatformTabs();
 
-        // IMPORTANT:
-        // Update Spotify buttons even though
-        // YouTube remains connected.
-        setSpotifyDisconnectedState();
-
-        // Keep dashboard visible.
         showDashboard();
-
-        // Clear Spotify PKCE state.
-        sessionStorage.removeItem(
-            "spotify_pkce_verifier"
-        );
 
         clearError();
 
@@ -1167,41 +1155,24 @@ function logoutFromGenPlaylist() {
     }
 
 
-    // No other platform is connected.
-    lastConnectedPlatform =
-        null;
+    // ------------------------------------------
+    // 3. Neither platform is connected.
+    //    Return to the hero landing page.
+    // ------------------------------------------
 
-    applyPlatformTheme();
+    activeLibrarySource = "spotify";
 
     updateLibrarySourceBar();
     updateHistoryPlatformTabs();
 
-
-    // Clear Spotify PKCE state.
-    sessionStorage.removeItem(
-        "spotify_pkce_verifier"
-    );
-
-
-    // Best-effort Spotify browser logout.
-    window.open(
-        "https://accounts.spotify.com/logout",
-        "_blank",
-        "noopener,noreferrer"
-    );
-
-
-    // Reset the Spotify buttons.
-    setSpotifyDisconnectedState();
-
-
-    // Nothing else is connected,
-    // so hide the dashboard.
     hideDashboard();
 
+    // Show the landing/hero section again.
+    welcomeHero?.classList.remove(
+        "hidden"
+    );
 
     if (libraryList) {
-
         libraryList.innerHTML =
             `
             <p class="placeholder-text">
@@ -1209,12 +1180,9 @@ function logoutFromGenPlaylist() {
                 to see your playlists here.
             </p>
             `;
-
     }
 
-
     if (songGrid) {
-
         songGrid.innerHTML =
             `
             <p class="placeholder-text">
@@ -1222,14 +1190,11 @@ function logoutFromGenPlaylist() {
                 to see your top songs here.
             </p>
             `;
-
     }
-
 
     if (playlistPreview) {
         playlistPreview.innerHTML = "";
     }
-
 
     loadingSection?.classList.add(
         "hidden"
@@ -5219,6 +5184,9 @@ function updateLibrarySourceBar() {
 async function setActiveLibrarySource(source) {
 
     activeLibrarySource = source;
+
+    // Make the selected platform control the theme.
+    lastConnectedPlatform = source;
 
     sourceSpotifyBtn?.classList.toggle(
         "active",
