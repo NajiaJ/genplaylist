@@ -1043,6 +1043,117 @@ function friendlyMessageFor(error) {
 
 }
 
+// =====================================================
+// FRIENDLY YOUTUBE ERROR MESSAGES
+// =====================================================
+
+function friendlyYoutubeMessageFor(error) {
+
+    const message =
+        error?.message ||
+        "";
+
+
+    if (
+        message ===
+        "YOUTUBE_AUTH_EXPIRED"
+    ) {
+
+        return (
+            "Your YouTube Music session expired. " +
+            "Please reconnect your account."
+        );
+
+    }
+
+
+    if (
+        message ===
+        "YOUTUBE_QUOTA_EXCEEDED"
+    ) {
+
+        return (
+            "YouTube's daily API limit has been reached. " +
+            "Please try again later."
+        );
+
+    }
+
+
+    if (
+        message ===
+        "YOUTUBE_WRITE_PERMISSION_REQUIRED"
+    ) {
+
+        return (
+            "GenPlaylist doesn't have permission to save " +
+            "playlists to your YouTube account. " +
+            "Please reconnect YouTube Music and allow playlist access."
+        );
+
+    }
+
+
+    if (
+        message ===
+        "YOUTUBE_NO_VIDEOS_ADDED"
+    ) {
+
+        return (
+            "YouTube couldn't add any of these songs to the playlist. " +
+            "Try generating the playlist again."
+        );
+
+    }
+
+
+    if (
+        message ===
+        "YOUTUBE_NOT_FOUND"
+    ) {
+
+        return (
+            "The YouTube playlist could not be created. " +
+            "Please reconnect YouTube Music and try again."
+        );
+
+    }
+
+
+    if (
+        message.startsWith(
+            "YOUTUBE_ERROR_"
+        )
+    ) {
+
+        return (
+            "YouTube couldn't save this playlist. " +
+            "Some videos may not be available for playlists."
+        );
+
+    }
+
+
+    if (
+        message ===
+        "NETWORK_ERROR"
+    ) {
+
+        return (
+            "We couldn't reach YouTube. " +
+            "Please check your connection and try again."
+        );
+
+    }
+
+
+    return (
+        "YouTube Music couldn't save this playlist. " +
+        "Please try again."
+    );
+
+}
+
 
 // =====================================================
 // LOGIN BUTTON STATE
@@ -1055,14 +1166,11 @@ function friendlyMessageFor(error) {
 let lastConnectedPlatform = null;
 
 function applyPlatformTheme() {
-
-    if (lastConnectedPlatform === "youtube") {
+    if (currentPlatform === "youtube") {
         document.body.classList.add("theme-youtube");
-        return;
+    } else {
+        document.body.classList.remove("theme-youtube");
     }
-
-    document.body.classList.remove("theme-youtube");
-
 }
 
 
@@ -1072,7 +1180,7 @@ function setSpotifyConnectedState() {
         button => {
 
             button.textContent =
-                "Log Out";
+                "Spotify Log Out";
 
             button.disabled =
                 false;
@@ -4052,6 +4160,10 @@ async function createYoutubePlaylist(
 // ADD VIDEOS TO YOUTUBE PLAYLIST
 // =====================================================
 
+// =====================================================
+// ADD VIDEOS TO YOUTUBE PLAYLIST
+// =====================================================
+
 async function addVideosToYoutubePlaylist(
     playlistId,
     videoIds
@@ -4071,51 +4183,104 @@ async function addVideosToYoutubePlaylist(
         videoIds.length === 0
     ) {
 
-        return;
+        return {
+            added: 0,
+            skipped: 0
+        };
 
     }
+
+
+    // Remove empty IDs and duplicates before sending
+    // anything to YouTube.
+    const uniqueVideoIds =
+        [...new Set(
+            videoIds.filter(Boolean)
+        )];
+
+
+    let added = 0;
+    let skipped = 0;
 
 
     for (
-        const videoId of videoIds
+        const videoId of uniqueVideoIds
     ) {
 
-        if (!videoId) {
-            continue;
-        }
+        try {
 
+            await youtubeFetch(
+                "/playlistItems?part=snippet",
+                {
 
-        await youtubeFetch(
-            "/playlistItems?part=snippet",
-            {
+                    method:
+                        "POST",
 
-                method:
-                    "POST",
+                    body:
+                        JSON.stringify({
 
-                body:
-                    JSON.stringify({
+                            snippet: {
 
-                        snippet: {
+                                playlistId,
 
-                            playlistId,
+                                resourceId: {
 
-                            resourceId: {
+                                    kind:
+                                        "youtube#video",
 
-                                kind:
-                                    "youtube#video",
+                                    videoId
 
-                                videoId
+                                }
 
                             }
 
-                        }
+                        })
 
-                    })
+                }
+            );
 
-            }
+
+            added++;
+
+
+        } catch (error) {
+
+            console.warn(
+                "[YouTube] Skipping video:",
+                videoId,
+                error
+            );
+
+
+            skipped++;
+
+        }
+
+    }
+
+
+    console.log(
+        `[YouTube] Playlist complete: ${added} added, ${skipped} skipped.`
+    );
+
+
+    // Only fail if absolutely nothing could be added.
+    if (
+        added === 0 &&
+        uniqueVideoIds.length > 0
+    ) {
+
+        throw new Error(
+            "YOUTUBE_NO_VIDEOS_ADDED"
         );
 
     }
+
+
+    return {
+        added,
+        skipped
+    };
 
 }
 
@@ -4763,7 +4928,7 @@ function setYoutubeConnectedState() {
     youtubeLoginButtons.forEach(
         button => {
 
-            button.textContent = "YouTube Connected ✓";
+            button.textContent = "Youtube Music Log Out";
             button.classList.add("logout-state");
 
         }
@@ -5005,31 +5170,50 @@ async function youtubeFetch(
             await res.json().catch(
                 () => null
             );
-
-
+    
+    
+        const reason =
+            body?.error?.errors?.[0]?.reason ||
+            body?.error?.status ||
+            "";
+    
+    
         console.error(
             "[YouTube API error]",
             {
-
                 status:
                     res.status,
-
+    
                 method,
-
+    
                 path,
-
+    
+                reason,
+    
                 body
-
             }
         );
-
-
-        throw new Error(
-            `YOUTUBE_ERROR_${res.status}`
-        );
-
+    
+    
+        const error =
+            new Error(
+                `YOUTUBE_ERROR_${res.status}`
+            );
+    
+    
+        error.status =
+            res.status;
+    
+        error.reason =
+            reason;
+    
+        error.youtubeBody =
+            body;
+    
+    
+        throw error;
+    
     }
-
 
     // -----------------------------------------
     // NO CONTENT
