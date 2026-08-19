@@ -1056,12 +1056,12 @@ let lastConnectedPlatform = null;
 
 function applyPlatformTheme() {
 
-    if (activeLibrarySource === "youtube") {
+    if (lastConnectedPlatform === "youtube") {
         document.body.classList.add("theme-youtube");
-    } else {
-        document.body.classList.remove("theme-youtube");
+        return;
     }
 
+    document.body.classList.remove("theme-youtube");
 }
 
 
