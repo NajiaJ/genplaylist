@@ -48,14 +48,11 @@ const errorBannerText =
 const errorBannerDismiss =
     document.getElementById("errorBannerDismiss");
 
-const saveDbBtn =
-    document.getElementById("saveDbBtn");
+const savePlaylistBtn =
+    document.getElementById("savePlaylistBtn");
 
-const saveSpotifyBtn =
-    document.getElementById("saveSpotifyBtn");
-
-const historySaveSpotifyBtn =
-    document.getElementById("historySaveSpotifyBtn");
+const historySaveBtn =
+    document.getElementById("historySaveBtn");
 
 const viewHistoryBtn =
     document.getElementById("viewHistoryBtn");
@@ -402,6 +399,132 @@ function getSmallestImage(album) {
             album.images.length - 1
         ]?.url || null
     );
+
+}
+
+
+// =====================================================
+// YOUTUBE NORMALIZATION
+// =====================================================
+// Everything downstream (scorePool, weightForIntent,
+// assemblePlaylist, weightedSampleWithoutReplacement,
+// renderLibraries, renderTopSongs, createTrackElement) was
+// written against Spotify-shaped objects. Rather than duplicate
+// all of that logic for YouTube, these functions translate raw
+// YouTube API responses into that same shape once, up front —
+// so all the shared code below works completely unchanged for
+// either platform.
+
+// Parses YouTube's ISO 8601 duration ("PT4M13S") into
+// milliseconds, since YouTube doesn't return a plain integer
+// like Spotify's duration_ms.
+function parseIso8601DurationToMs(duration) {
+
+    if (!duration) {
+        return 0;
+    }
+
+    const match =
+        duration.match(
+            /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/
+        );
+
+    if (!match) {
+        return 0;
+    }
+
+    const hours = parseInt(match[1] || "0", 10);
+    const minutes = parseInt(match[2] || "0", 10);
+    const seconds = parseInt(match[3] || "0", 10);
+
+    return (
+        (hours * 3600 + minutes * 60 + seconds) * 1000
+    );
+
+}
+
+
+// YouTube's thumbnails come back as an object keyed by size
+// name, not an array. Ordered largest-to-smallest here so
+// getSmallestImage's `images[length - 1]` convention still
+// picks the smallest one, same as it does for Spotify.
+function youtubeThumbnailsToImages(thumbnails) {
+
+    if (!thumbnails) {
+        return [];
+    }
+
+    const order = ["maxres", "standard", "high", "medium", "default"];
+
+    return order
+        .map(key => thumbnails[key])
+        .filter(Boolean)
+        .map(thumb => ({ url: thumb.url }));
+
+}
+
+
+// A YouTube playlist (from playlists.list) into the same shape
+// renderLibraries already expects from Spotify.
+function normalizeYoutubePlaylist(playlist) {
+
+    return {
+
+        id: playlist.id,
+        name: playlist.snippet?.title || "Untitled",
+
+        tracks: {
+            total: playlist.contentDetails?.itemCount ?? 0
+        }
+
+    };
+
+}
+
+
+// A single YouTube video (merged from a playlistItem + its own
+// videos.list details, since duration only comes from the
+// latter) into the same shape scorePool/renderTopSongs/
+// createTrackElement already expect from Spotify.
+function normalizeYoutubeTrack(item, videoDetails) {
+
+    const videoId =
+        item.contentDetails?.videoId ||
+        item.snippet?.resourceId?.videoId ||
+        item.id;
+
+    if (!videoId) {
+        return null;
+    }
+
+    return {
+
+        id: videoId,
+        name: item.snippet?.title || "Untitled",
+
+        artists: [
+            { name: item.snippet?.videoOwnerChannelTitle || item.snippet?.channelTitle || "Unknown" }
+        ],
+
+        album: {
+            images: youtubeThumbnailsToImages(item.snippet?.thumbnails)
+        },
+
+        // Deliberately reusing the `external_urls.spotify` key
+        // name that scorePool already reads — not a Spotify URL,
+        // a YouTube watch URL. Keeps scorePool untouched rather
+        // than forking it per-platform for one field.
+        external_urls: {
+            spotify: `https://music.youtube.com/watch?v=${videoId}`
+        },
+
+        uri: videoId,
+
+        duration_ms: parseIso8601DurationToMs(videoDetails?.contentDetails?.duration),
+
+        added_at: item.snippet?.publishedAt || null
+
+    };
 
 }
 
@@ -1009,6 +1132,13 @@ function logoutFromGenPlaylist() {
         applyPlatformTheme();
     }
 
+    updateLibrarySourceBar();
+    updateHistoryPlatformTabs();
+
+    if (activeLibrarySource === "spotify" && youtubeAccessToken) {
+        setActiveLibrarySource("youtube");
+    }
+
     sessionStorage.removeItem(
         "spotify_pkce_verifier"
     );
@@ -1170,7 +1300,9 @@ async function initialiseSpotifyAuth() {
             spotifyUserId = null;
         }
 
-        await loadLibrariesAndAnchors();
+        updateLibrarySourceBar();
+        updateHistoryPlatformTabs();
+        await setActiveLibrarySource("spotify");
 
     } catch (error) {
 
@@ -1784,10 +1916,13 @@ generateBtn?.addEventListener(
 
 async function generatePlaylist() {
 
-    if (!spotifyAccessToken) {
+    const activeToken =
+        activeLibrarySource === "youtube" ? youtubeAccessToken : spotifyAccessToken;
+
+    if (!activeToken) {
 
         showError(
-            "Connect your Spotify account first."
+            `Connect your ${activeLibrarySource === "youtube" ? "YouTube Music" : "Spotify"} account first.`
         );
 
         return;
@@ -1797,7 +1932,7 @@ async function generatePlaylist() {
     if (!libraryList) {
 
         showError(
-            "Your Spotify libraries aren't available yet."
+            "Your libraries aren't available yet."
         );
 
         return;
@@ -1915,9 +2050,9 @@ async function generatePlaylist() {
         // -----------------------------------------
 
         const pool =
-            await buildTrackPool(
-                selectedLibraries
-            );
+            activeLibrarySource === "youtube"
+                ? await buildYoutubeTrackPool(selectedLibraries)
+                : await buildTrackPool(selectedLibraries);
 
 
         if (
@@ -1934,11 +2069,14 @@ async function generatePlaylist() {
         // -----------------------------------------
         // LISTENING SIGNALS
         // -----------------------------------------
+        // YouTube has no top-tracks/recently-played equivalent,
+        // so it always runs through the added_at fallback that
+        // Spotify only falls back to when its own signals fail.
 
         const signals =
-            await fetchSignalsWithFallback(
-                pool
-            );
+            activeLibrarySource === "youtube"
+                ? computeAddedAtSignals(pool)
+                : await fetchSignalsWithFallback(pool);
 
 
         // -----------------------------------------
@@ -1986,6 +2124,16 @@ async function generatePlaylist() {
         );
 
 
+        // A previous save (if any) left the button disabled with
+        // "Saved ✓" text — a fresh playlist needs it clickable
+        // again, labeled for whichever platform is active now.
+        if (savePlaylistBtn) {
+            savePlaylistBtn.disabled = false;
+        }
+
+        updateSaveButtonLabel();
+
+
         loadingSection?.classList.add(
             "hidden"
         );
@@ -2011,9 +2159,19 @@ async function generatePlaylist() {
 
 
         if (
-            error.message ===
-            "AUTH_EXPIRED"
+            error.message === "AUTH_EXPIRED" ||
+            error.message === "YOUTUBE_AUTH_EXPIRED"
         ) {
+
+            if (error.message === "YOUTUBE_AUTH_EXPIRED") {
+                youtubeAccessToken = null;
+                setYoutubeDisconnectedState();
+                showError(
+                    "Your YouTube session expired. Please reconnect.",
+                    { retry: () => connectYoutube() }
+                );
+                return;
+            }
 
             handleAuthExpired();
 
@@ -2037,7 +2195,9 @@ async function generatePlaylist() {
 
 
         showError(
-            friendlyMessageFor(error),
+            activeLibrarySource === "youtube"
+                ? friendlyYoutubeMessageFor(error)
+                : friendlyMessageFor(error),
             {
                 retry:
                     generatePlaylist
@@ -2297,6 +2457,17 @@ async function fetchSignalsWithFallback(
     // -----------------------------------------
     // FALLBACK: ADDED DATE
     // -----------------------------------------
+
+    return computeAddedAtSignals(pool);
+
+}
+
+
+// Shared by both Spotify's fallback path (when top-tracks/
+// recently-played are unavailable) and YouTube's primary path
+// (which has no listening-history equivalent at all) — derives
+// recency/dormancy purely from each track's added_at date.
+function computeAddedAtSignals(pool) {
 
     const dated =
         pool
@@ -3317,202 +3488,23 @@ function createTrackElement(
 }
 
 
-// // =====================================================
-// // SAVE TO SPOTIFY
-// // =====================================================
-
-// saveSpotifyBtn?.addEventListener(
-//     "click",
-//     savePlaylistToSpotify
-// );
-
-
-// async function savePlaylistToSpotify() {
-
-//     if (!spotifyAccessToken) {
-
-//         showError(
-//             "Connect your Spotify account first."
-//         );
-
-//         return;
-
-//     }
-
-
-//     if (!playlistPreview) {
-
-//         showError(
-//             "Generate a playlist first before saving it to Spotify."
-//         );
-
-//         return;
-
-//     }
-
-
-//     const tracks =
-//         Array.from(
-//             playlistPreview.querySelectorAll(
-//                 ".track"
-//             )
-//         );
-
-
-//     if (
-//         tracks.length === 0
-//     ) {
-
-//         showError(
-//             "Generate a playlist first before saving it to Spotify."
-//         );
-
-//         return;
-
-//     }
-
-
-//     const trackUris =
-//         tracks
-//             .map(
-//                 track =>
-//                     track.dataset.uri
-//             )
-//             .filter(
-//                 uri =>
-//                     uri &&
-//                     uri.startsWith(
-//                         "spotify:track:"
-//                     )
-//             );
-
-
-//     if (
-//         trackUris.length === 0
-//     ) {
-
-//         showError(
-//             "The generated playlist doesn't contain any valid Spotify tracks."
-//         );
-
-//         return;
-
-//     }
-
-
-//     const name =
-//         playlistNameInput?.value.trim() ||
-//         "GenPlaylist Mix";
-
-
-//     saveSpotifyBtn.disabled =
-//         true;
-
-//     saveSpotifyBtn.textContent =
-//         "Saving…";
-
-
-//     try {
-
-//         const currentUser =
-//             await spotifyFetch(
-//                 "/me"
-//             );
-
-
-//         const playlist =
-//             await createSpotifyPlaylist(
-//                 currentUser.id,
-//                 name
-//             );
-
-
-//         await addTracksToSpotifyPlaylist(
-//             playlist.id,
-//             trackUris
-//         );
-
-
-//         saveSpotifyBtn.textContent =
-//             "Saved to Spotify ✓";
-
-
-//         clearError();
-
-
-//         if (
-//             playlist.external_urls?.spotify
-//         ) {
-
-//             window.open(
-//                 playlist.external_urls.spotify,
-//                 "_blank",
-//                 "noopener,noreferrer"
-//             );
-
-//         }
-
-//     } catch (error) {
-
-//         console.error(
-//             "[Spotify save]",
-//             error
-//         );
-
-
-//         saveSpotifyBtn.disabled =
-//             false;
-
-//         saveSpotifyBtn.textContent =
-//             "Save to Spotify";
-
-
-//         if (
-//             error.message ===
-//             "AUTH_EXPIRED"
-//         ) {
-
-//             handleAuthExpired();
-
-//             return;
-
-//         }
-
-
-//         showError(
-//             friendlyMessageFor(error),
-//             {
-//                 retry:
-//                     savePlaylistToSpotify
-//             }
-//         );
-
-//     }
-
-// }
-
 // =====================================================
-// SAVE TO SPOTIFY
+// SAVE GENERATED PLAYLIST (combined)
 // =====================================================
-//
-// Supports both:
-//
-// 1. The currently generated playlist
-// 2. A playlist loaded from Supabase history
-//
-// The existing Save to Spotify button continues to work
-// for newly generated playlists.
-// The separate history button uses the same save function
-// but receives the historical playlist data.
-// =====================================================
+// One button does both jobs that used to be two buttons: saves
+// to Supabase (the right table for whichever platform is
+// active) AND creates the real playlist on that platform, in
+// one click. The History panel's save button reuses the same
+// platform-creation step, but skips the Supabase insert since
+// a history row is already saved.
 
-saveSpotifyBtn?.addEventListener(
+savePlaylistBtn?.addEventListener(
     "click",
-    () => savePlaylistToSpotify()
+    () => saveGeneratedPlaylist()
 );
 
 
-historySaveSpotifyBtn?.addEventListener(
+historySaveBtn?.addEventListener(
     "click",
     () => {
 
@@ -3526,270 +3518,275 @@ historySaveSpotifyBtn?.addEventListener(
 
         }
 
-        savePlaylistToSpotify(
+        saveHistoryEntryToPlatform(
             currentHistoryRow,
-            historySaveSpotifyBtn
+            currentHistoryPlatform,
+            historySaveBtn
         );
 
     }
 );
 
 
-let currentHistoryRow =
-    null;
+let currentHistoryRow = null;
+let currentHistoryPlatform = "spotify";
 
 
-async function savePlaylistToSpotify(
-    historyRow = null,
-    button = saveSpotifyBtn
+// Extracts track URIs in the shape each platform's API needs —
+// Spotify wants "spotify:track:..." URIs, YouTube just wants
+// plain video IDs (that's what normalizeYoutubeTrack stores in
+// `uri` already, so no prefix to check there).
+function getPlatformTrackUris(tracks, platform) {
+
+    if (platform === "youtube") {
+
+        return tracks
+            .map(track => track.uri)
+            .filter(Boolean);
+
+    }
+
+    return tracks
+        .map(track => track.uri)
+        .filter(uri => uri && uri.startsWith("spotify:track:"));
+
+}
+
+
+async function createAndPopulatePlatformPlaylist(
+    platform,
+    name,
+    trackUris
 ) {
 
-    if (!spotifyAccessToken) {
-
-        showError(
-            "Connect your Spotify account first."
-        );
-
-        return;
-
-    }
-
-
-    // -----------------------------------------
-    // GET TRACK URIS
-    // -----------------------------------------
-    //
-    // Historical playlist:
-    // use the tracks stored in Supabase.
-    //
-    // New playlist:
-    // use the tracks currently displayed
-    // in playlistPreview.
-    //
-    // -----------------------------------------
-
-    let trackUris = [];
-    let name = "GenPlaylist Mix";
-
-
-    if (historyRow) {
-
-        const historicalTracks =
-            Array.isArray(historyRow.tracks)
-                ? historyRow.tracks
-                : [];
-
-
-        if (
-            historicalTracks.length === 0
-        ) {
-
-            showError(
-                "This saved playlist doesn't contain any tracks."
-            );
-
-            return;
-
-        }
-
-
-        trackUris =
-            historicalTracks
-                .map(
-                    track =>
-                        track.uri
-                )
-                .filter(
-                    uri =>
-                        uri &&
-                        uri.startsWith(
-                            "spotify:track:"
-                        )
-                );
-
-
-        name =
-            historyRow.playlist_name?.trim() ||
-            "GenPlaylist Mix";
-
-    }
-
-
-    else {
-
-        if (!playlistPreview) {
-
-            showError(
-                "Generate a playlist first before saving it to Spotify."
-            );
-
-            return;
-
-        }
-
-
-        const tracks =
-            Array.from(
-                playlistPreview.querySelectorAll(
-                    ".track"
-                )
-            );
-
-
-        if (
-            tracks.length === 0
-        ) {
-
-            showError(
-                "Generate a playlist first before saving it to Spotify."
-            );
-
-            return;
-
-        }
-
-
-        trackUris =
-            tracks
-                .map(
-                    track =>
-                        track.dataset.uri
-                )
-                .filter(
-                    uri =>
-                        uri &&
-                        uri.startsWith(
-                            "spotify:track:"
-                        )
-                );
-
-
-        name =
-            playlistNameInput?.value.trim() ||
-            "GenPlaylist Mix";
-
-    }
-
-
-    // -----------------------------------------
-    // VALIDATE TRACKS
-    // -----------------------------------------
-
     if (
-        trackUris.length === 0
+        platform === "youtube"
     ) {
 
-        showError(
-            historyRow
-                ? "This saved playlist doesn't contain any valid Spotify tracks."
-                : "The generated playlist doesn't contain any valid Spotify tracks."
-        );
+        if (!youtubeAccessToken) {
 
-        return;
-
-    }
-
-
-    // -----------------------------------------
-    // BUTTON STATE
-    // -----------------------------------------
-
-    if (button) {
-
-        button.disabled =
-            true;
-
-        button.textContent =
-            "Saving…";
-
-    }
-
-
-    try {
-
-        const currentUser =
-            await spotifyFetch(
-                "/me"
+            throw new Error(
+                "YOUTUBE_AUTH_EXPIRED"
             );
+
+        }
 
 
         const playlist =
-            await createSpotifyPlaylist(
-                currentUser.id,
+            await createYoutubePlaylist(
                 name
             );
 
 
-        await addTracksToSpotifyPlaylist(
+        if (
+            !playlist?.id
+        ) {
+
+            throw new Error(
+                "YOUTUBE_NOT_FOUND"
+            );
+
+        }
+
+
+        await addVideosToYoutubePlaylist(
             playlist.id,
             trackUris
         );
 
 
-        if (button) {
+        return {
 
-            button.textContent =
-                "Saved to Spotify ✓";
+            id:
+                playlist.id,
 
+            url:
+                `https://music.youtube.com/playlist?list=${encodeURIComponent(
+                    playlist.id
+                )}`
+
+        };
+
+    }
+
+
+    // -----------------------------------------
+    // SPOTIFY
+    // -----------------------------------------
+
+    const currentUser =
+        await spotifyFetch(
+            "/me"
+        );
+
+
+    const playlist =
+        await createSpotifyPlaylist(
+            currentUser.id,
+            name
+        );
+
+
+    await addTracksToSpotifyPlaylist(
+        playlist.id,
+        trackUris
+    );
+
+
+    return {
+
+        id:
+            playlist.id,
+
+        url:
+            playlist.external_urls?.spotify ||
+            null
+
+    };
+
+}
+
+
+function extractTracksFromPreview() {
+
+    if (!playlistPreview) {
+        return [];
+    }
+
+    return Array.from(
+        playlistPreview.querySelectorAll(".track")
+    ).map(element => ({
+
+        id: element.dataset.id || null,
+        uri: element.dataset.uri || null,
+        title: element.querySelector("h4")?.textContent || "",
+        artist: element.querySelector("span")?.textContent || "",
+        duration_ms: parseInt(element.dataset.duration || "0", 10),
+        image: element.dataset.image || null
+
+    }));
+
+}
+
+
+async function saveGeneratedPlaylist() {
+
+    const platform = activeLibrarySource;
+
+    const tracks = extractTracksFromPreview();
+
+    if (tracks.length === 0) {
+
+        showError(
+            "Generate a playlist first before saving it."
+        );
+
+        return;
+
+    }
+
+    const trackUris = getPlatformTrackUris(tracks, platform);
+
+    if (trackUris.length === 0) {
+
+        showError(
+            `The generated playlist doesn't contain any valid ${platform === "youtube" ? "YouTube" : "Spotify"} tracks.`
+        );
+
+        return;
+
+    }
+
+    const name =
+        playlistNameInput?.value.trim() ||
+        "GenPlaylist Mix";
+
+    if (savePlaylistBtn) {
+        savePlaylistBtn.disabled = true;
+        savePlaylistBtn.textContent = "Saving…";
+    }
+
+    // Step 1: Supabase (History). Non-fatal if it fails — still
+    // attempt the real platform save below, since losing history
+    // is a smaller problem than not saving the playlist at all.
+    try {
+
+        const client = getSupabaseClient();
+
+        const table =
+            platform === "youtube" ? "youtube_generated_playlists" : "generated_playlists";
+
+        const userIdField =
+            platform === "youtube" ? "youtube_user_id" : "spotify_user_id";
+
+        const { error } = await client
+            .from(table)
+            .insert({
+
+                playlist_name: name,
+                intent: selectedIntent,
+                track_count: tracks.length,
+                [userIdField]: platform === "youtube" ? youtubeUserId : spotifyUserId,
+                tracks
+
+            });
+
+        if (error) {
+            throw error;
         }
 
+    } catch (historyError) {
+
+        console.error("[Supabase]", historyError);
+        // Intentionally not shown as a blocking error — see comment above.
+
+    }
+
+    // Step 2: the real platform playlist.
+    try {
+
+        const playlist = await createAndPopulatePlatformPlaylist(platform, name, trackUris);
+
+        if (savePlaylistBtn) {
+            savePlaylistBtn.textContent =
+                `Saved to ${platform === "youtube" ? "YouTube Music" : "Spotify"} ✓`;
+        }
 
         clearError();
 
-
-        if (
-            playlist.external_urls?.spotify
-        ) {
-
-            window.open(
-                playlist.external_urls.spotify,
-                "_blank",
-                "noopener,noreferrer"
-            );
-
+        if (playlist.url) {
+            window.open(playlist.url, "_blank", "noopener,noreferrer");
         }
 
     } catch (error) {
 
-        console.error(
-            "[Spotify save]",
-            error
-        );
+        console.error("[Platform save]", error);
 
-
-        if (button) {
-
-            button.disabled =
-                false;
-
-            button.textContent =
-                "Save to Spotify";
-
+        if (savePlaylistBtn) {
+            savePlaylistBtn.disabled = false;
+            updateSaveButtonLabel();
         }
 
-
         if (
-            error.message ===
-            "AUTH_EXPIRED"
+            error.message === "AUTH_EXPIRED" ||
+            error.message === "YOUTUBE_AUTH_EXPIRED"
         ) {
 
-            handleAuthExpired();
+            if (error.message === "YOUTUBE_AUTH_EXPIRED") {
+                youtubeAccessToken = null;
+                setYoutubeDisconnectedState();
+                showError("Your YouTube session expired. Please reconnect.");
+                return;
+            }
 
+            handleAuthExpired();
             return;
 
         }
 
-
         showError(
-            friendlyMessageFor(error),
-            {
-                retry:
-                    () =>
-                        savePlaylistToSpotify(
-                            historyRow,
-                            button
-                        )
-            }
+            platform === "youtube" ? friendlyYoutubeMessageFor(error) : friendlyMessageFor(error),
+            { retry: saveGeneratedPlaylist }
         );
 
     }
@@ -3797,8 +3794,105 @@ async function savePlaylistToSpotify(
 }
 
 
-// =====================================================
-// CREATE SPOTIFY PLAYLIST
+async function saveHistoryEntryToPlatform(row, platform, button) {
+
+    const historicalTracks =
+        Array.isArray(row.tracks) ? row.tracks : [];
+
+    if (historicalTracks.length === 0) {
+
+        showError(
+            "This saved playlist doesn't contain any tracks."
+        );
+
+        return;
+
+    }
+
+    const trackUris = getPlatformTrackUris(historicalTracks, platform);
+
+    if (trackUris.length === 0) {
+
+        showError(
+            `This saved playlist doesn't contain any valid ${platform === "youtube" ? "YouTube" : "Spotify"} tracks.`
+        );
+
+        return;
+
+    }
+
+    const name = row.playlist_name?.trim() || "GenPlaylist Mix";
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = "Saving…";
+    }
+
+    try {
+
+        const playlist = await createAndPopulatePlatformPlaylist(platform, name, trackUris);
+
+        if (button) {
+            button.textContent = `Saved to ${platform === "youtube" ? "YouTube Music" : "Spotify"} ✓`;
+        }
+
+        clearError();
+
+        if (playlist.url) {
+            window.open(playlist.url, "_blank", "noopener,noreferrer");
+        }
+
+    } catch (error) {
+
+        console.error("[History save]", error);
+
+        if (button) {
+            button.disabled = false;
+            button.textContent = `Save to ${platform === "youtube" ? "YouTube Music" : "Spotify"}`;
+        }
+
+        if (
+            error.message === "AUTH_EXPIRED" ||
+            error.message === "YOUTUBE_AUTH_EXPIRED"
+        ) {
+
+            if (error.message === "YOUTUBE_AUTH_EXPIRED") {
+                youtubeAccessToken = null;
+                setYoutubeDisconnectedState();
+                showError("Your YouTube session expired. Please reconnect.");
+                return;
+            }
+
+            handleAuthExpired();
+            return;
+
+        }
+
+        showError(
+            platform === "youtube" ? friendlyYoutubeMessageFor(error) : friendlyMessageFor(error),
+            { retry: () => saveHistoryEntryToPlatform(row, platform, button) }
+        );
+
+    }
+
+}
+
+
+// Keeps the single save button's label in sync with whichever
+// platform is currently active, so it never says "Save to
+// Spotify" while YouTube is the one about to actually be used.
+function updateSaveButtonLabel() {
+
+    if (!savePlaylistBtn) {
+        return;
+    }
+
+    savePlaylistBtn.textContent =
+        `Save to ${activeLibrarySource === "youtube" ? "YouTube Music" : "Spotify"}`;
+
+}
+
+
 // =====================================================
 
 async function createSpotifyPlaylist(
@@ -3885,6 +3979,148 @@ async function addTracksToSpotifyPlaylist(
 
 
 // =====================================================
+// CREATE YOUTUBE PLAYLIST
+// =====================================================
+
+// =====================================================
+// CREATE YOUTUBE PLAYLIST
+// =====================================================
+
+async function createYoutubePlaylist(
+    name
+) {
+
+    if (!youtubeAccessToken) {
+
+        throw new Error(
+            "YOUTUBE_AUTH_EXPIRED"
+        );
+
+    }
+
+
+    const safeName =
+        name?.trim() ||
+        "GenPlaylist Mix";
+
+
+    return youtubeFetch(
+        "/playlists?part=snippet,status",
+        {
+
+            method:
+                "POST",
+
+            body:
+                JSON.stringify({
+
+                    snippet: {
+
+                        title:
+                            safeName,
+
+                        description:
+                            `Generated by GenPlaylist • ${selectedIntent}`
+
+                    },
+
+                    status: {
+
+                        privacyStatus:
+                            "private"
+
+                    }
+
+                })
+
+        }
+    );
+
+}
+
+
+// =====================================================
+// ADD VIDEOS TO YOUTUBE PLAYLIST
+// =====================================================
+// Unlike Spotify, YouTube's API can only add ONE video per
+// request — no batching. Each insert costs 50 quota units, so a
+// 50-song playlist costs ~2,550 units, roughly a quarter of the
+// free 10,000/day quota. That's why the save flow below caps
+// YouTube saves to a smaller size by default.
+
+// =====================================================
+// ADD VIDEOS TO YOUTUBE PLAYLIST
+// =====================================================
+
+async function addVideosToYoutubePlaylist(
+    playlistId,
+    videoIds
+) {
+
+    if (!playlistId) {
+
+        throw new Error(
+            "YOUTUBE_NOT_FOUND"
+        );
+
+    }
+
+
+    if (
+        !Array.isArray(videoIds) ||
+        videoIds.length === 0
+    ) {
+
+        return;
+
+    }
+
+
+    for (
+        const videoId of videoIds
+    ) {
+
+        if (!videoId) {
+            continue;
+        }
+
+
+        await youtubeFetch(
+            "/playlistItems?part=snippet",
+            {
+
+                method:
+                    "POST",
+
+                body:
+                    JSON.stringify({
+
+                        snippet: {
+
+                            playlistId,
+
+                            resourceId: {
+
+                                kind:
+                                    "youtube#video",
+
+                                videoId
+
+                            }
+
+                        }
+
+                    })
+
+            }
+        );
+
+    }
+
+}
+
+
+// =====================================================
 // SUPABASE CLIENT
 // =====================================================
 
@@ -3921,178 +4157,6 @@ function getSupabaseClient() {
 
 
 // =====================================================
-// SAVE TO SUPABASE
-// =====================================================
-
-saveDbBtn?.addEventListener(
-    "click",
-    savePlaylistToDatabase
-);
-
-
-async function savePlaylistToDatabase() {
-
-    if (!playlistPreview) {
-
-        showError(
-            "Generate a playlist first before saving it."
-        );
-
-        return;
-
-    }
-
-
-    const tracks =
-        Array.from(
-            playlistPreview.querySelectorAll(
-                ".track"
-            )
-        ).map(
-            element => ({
-
-                id:
-                    element.dataset.id ||
-                    null,
-
-                uri:
-                    element.dataset.uri ||
-                    null,
-
-                title:
-                    element.querySelector(
-                        "h4"
-                    )?.textContent ||
-                    "",
-
-                artist:
-                    element.querySelector(
-                        "span"
-                    )?.textContent ||
-                    "",
-
-                duration_ms:
-                    parseInt(
-                        element.dataset.duration ||
-                        "0",
-                        10
-                    ),
-
-                image:
-                    element.dataset.image ||
-                    null
-
-            })
-        );
-
-
-    if (
-        tracks.length === 0
-    ) {
-
-        showError(
-            "Generate a playlist first before saving it."
-        );
-
-        return;
-
-    }
-
-
-    saveDbBtn.disabled =
-        true;
-
-    saveDbBtn.textContent =
-        "Saving…";
-
-
-    try {
-
-        const client =
-            getSupabaseClient();
-
-
-        const {
-            error
-        } =
-            await client
-                .from(
-                    "generated_playlists"
-                )
-                .insert({
-
-                    playlist_name:
-                        playlistNameInput?.value.trim() ||
-                        null,
-
-                    intent:
-                        selectedIntent,
-
-                    track_count:
-                        tracks.length,
-
-                    spotify_user_id:
-                        spotifyUserId,
-
-                    tracks
-
-                });
-
-
-        if (error) {
-            throw error;
-        }
-
-
-        saveDbBtn.textContent =
-            "Saved ✓";
-
-
-        clearError();
-
-    } catch (error) {
-
-        console.error(
-            "[Supabase]",
-            error
-        );
-
-
-        saveDbBtn.disabled =
-            false;
-
-        saveDbBtn.textContent =
-            "Save Playlist";
-
-
-        if (
-            error.message ===
-            "SUPABASE_LIBRARY_MISSING"
-        ) {
-
-            showError(
-                "Supabase isn't loaded. Add the Supabase JavaScript library to your HTML."
-            );
-
-            return;
-
-        }
-
-
-        showError(
-            "Couldn't save your playlist. Please try again.",
-            {
-                retry:
-                    savePlaylistToDatabase
-            }
-        );
-
-    }
-
-}
-
-
-// =====================================================
 // PLAYLIST HISTORY
 // =====================================================
 // Filtered by spotify_user_id at the query level, so each user
@@ -4105,12 +4169,17 @@ async function savePlaylistToDatabase() {
 
 async function loadPlaylistHistory() {
 
-    if (!spotifyUserId) {
+    const platform = historyPlatform;
+
+    const userId =
+        platform === "youtube" ? youtubeUserId : spotifyUserId;
+
+    if (!userId) {
 
         historyList.innerHTML =
             `
             <p class="placeholder-text">
-                Connect Spotify to view your playlist history.
+                Connect ${platform === "youtube" ? "YouTube Music" : "Spotify"} to view your playlist history.
             </p>
             `;
 
@@ -4130,14 +4199,20 @@ async function loadPlaylistHistory() {
         const client =
             getSupabaseClient();
 
+        const table =
+            platform === "youtube" ? "youtube_generated_playlists" : "generated_playlists";
+
+        const userIdField =
+            platform === "youtube" ? "youtube_user_id" : "spotify_user_id";
+
         const {
             data,
             error
         } =
             await client
-                .from("generated_playlists")
+                .from(table)
                 .select("*")
-                .eq("spotify_user_id", spotifyUserId)
+                .eq(userIdField, userId)
                 .order("created_at", { ascending: false })
                 .limit(50);
 
@@ -4271,6 +4346,9 @@ function viewHistoryEntry(row) {
     currentHistoryRow =
         row;
 
+    currentHistoryPlatform =
+        historyPlatform;
+
 
     historyTrackViewTitle.textContent =
         row.playlist_name || "Untitled Playlist";
@@ -4279,16 +4357,17 @@ function viewHistoryEntry(row) {
     historyTrackList.innerHTML = "";
 
 
-    // Reset the history Spotify button whenever
-    // a different historical playlist is opened.
+    // Reset the save button whenever a different historical
+    // playlist is opened, labeled for whichever platform this
+    // specific row actually belongs to.
 
-    if (historySaveSpotifyBtn) {
+    if (historySaveBtn) {
 
-        historySaveSpotifyBtn.disabled =
+        historySaveBtn.disabled =
             false;
 
-        historySaveSpotifyBtn.textContent =
-            "Save to Spotify";
+        historySaveBtn.textContent =
+            `Save to ${currentHistoryPlatform === "youtube" ? "YouTube Music" : "Spotify"}`;
 
     }
 
@@ -4324,11 +4403,73 @@ function viewHistoryEntry(row) {
 }
 
 
+let historyPlatform = "spotify";
+
+const historyPlatformTabs =
+    document.getElementById("historyPlatformTabs");
+
+const historyTabSpotify =
+    document.getElementById("historyTabSpotify");
+
+const historyTabYoutube =
+    document.getElementById("historyTabYoutube");
+
+
+// Only worth showing the tabs once more than one platform is
+// actually connected — same reasoning as the Library Source bar.
+function updateHistoryPlatformTabs() {
+
+    if (!historyPlatformTabs) {
+        return;
+    }
+
+    const bothConnected =
+        Boolean(spotifyAccessToken) && Boolean(youtubeAccessToken);
+
+    historyPlatformTabs.classList.toggle("hidden", !bothConnected);
+
+}
+
+
+function setHistoryPlatform(platform) {
+
+    historyPlatform = platform;
+
+    historyTabSpotify?.classList.toggle("active", platform === "spotify");
+    historyTabYoutube?.classList.toggle("active", platform === "youtube");
+
+    historyTrackView.classList.add("hidden");
+    historyList.classList.remove("hidden");
+
+    loadPlaylistHistory();
+
+}
+
+
+historyTabSpotify?.addEventListener(
+    "click",
+    () => setHistoryPlatform("spotify")
+);
+
+historyTabYoutube?.addEventListener(
+    "click",
+    () => setHistoryPlatform("youtube")
+);
+
+
 function showPlaylistHistory() {
 
     historyPanel.classList.remove("hidden");
     historyTrackView.classList.add("hidden");
     historyList.classList.remove("hidden");
+
+    updateHistoryPlatformTabs();
+
+    // Default to whichever platform is currently active for
+    // generation — most likely what the person wants to see.
+    historyPlatform = activeLibrarySource;
+    historyTabSpotify?.classList.toggle("active", historyPlatform === "spotify");
+    historyTabYoutube?.classList.toggle("active", historyPlatform === "youtube");
 
     loadPlaylistHistory();
 
@@ -4447,67 +4588,136 @@ updatePlaylistSizeMode();
 //    Testing mode (up to ~100).
 
 const YOUTUBE_CLIENT_ID =
-    "PASTE_YOUR_GOOGLE_OAUTH_CLIENT_ID_HERE";
+    "314089697669-8l2s82s8hc58aqfm1bdbjl39ghtc6f6a.apps.googleusercontent.com";
 
 const YOUTUBE_SCOPES =
-    "https://www.googleapis.com/auth/youtube.readonly";
+    "https://www.googleapis.com/auth/youtube";
 
 const youtubeLoginButtons =
     document.querySelectorAll("#youtubeLoginBtn, #heroYoutubeLoginBtn");
 
 let youtubeAccessToken = null;
+let youtubeLikedPlaylistId = null;
 let youtubeTokenClient = null;
 
 
 function getYoutubeTokenClient() {
 
-    if (youtubeTokenClient) {
+    if (
+        youtubeTokenClient
+    ) {
+
         return youtubeTokenClient;
+
     }
+
 
     const PLACEHOLDER_YOUTUBE_CLIENT_ID =
         "PASTE_YOUR_GOOGLE_OAUTH_CLIENT_ID_HERE";
 
+
     if (
         !YOUTUBE_CLIENT_ID ||
-        YOUTUBE_CLIENT_ID === PLACEHOLDER_YOUTUBE_CLIENT_ID
+        YOUTUBE_CLIENT_ID ===
+            PLACEHOLDER_YOUTUBE_CLIENT_ID
     ) {
-        throw new Error("YOUTUBE_NOT_CONFIGURED");
+
+        throw new Error(
+            "YOUTUBE_NOT_CONFIGURED"
+        );
+
     }
+
 
     if (
         !window.google ||
         !window.google.accounts ||
         !window.google.accounts.oauth2
     ) {
-        throw new Error("YOUTUBE_LIBRARY_MISSING");
+
+        throw new Error(
+            "YOUTUBE_LIBRARY_MISSING"
+        );
+
     }
+
 
     youtubeTokenClient =
         window.google.accounts.oauth2.initTokenClient({
-            client_id: YOUTUBE_CLIENT_ID,
-            scope: YOUTUBE_SCOPES,
-            callback: (response) => {
 
-                if (response.error) {
-                    showError(
-                        `YouTube sign-in was cancelled or denied (${response.error}).`
+            client_id:
+                YOUTUBE_CLIENT_ID,
+
+            scope:
+                YOUTUBE_SCOPES,
+
+            callback:
+                response => {
+
+                    if (
+                        response.error
+                    ) {
+
+                        showError(
+                            `YouTube sign-in was cancelled or denied (${response.error}).`
+                        );
+
+                        return;
+
+                    }
+
+
+                    youtubeAccessToken =
+                        response.access_token;
+
+
+                    console.log(
+                        "[YouTube OAuth]",
+                        {
+
+                            hasToken:
+                                Boolean(
+                                    youtubeAccessToken
+                                ),
+
+                            tokenLength:
+                                youtubeAccessToken?.length,
+
+                            scope:
+                                response.scope,
+
+                            expiresIn:
+                                response.expires_in
+
+                        }
                     );
-                    return;
+
+
+                    lastConnectedPlatform =
+                        "youtube";
+
+
+                    setYoutubeConnectedState();
+
+                    applyPlatformTheme();
+
+                    showDashboard();
+
+                    clearError();
+
+                    updateLibrarySourceBar();
+
+                    updateHistoryPlatformTabs();
+
+
+                    setActiveLibrarySource(
+                        "youtube"
+                    );
+
                 }
 
-                youtubeAccessToken = response.access_token;
-                lastConnectedPlatform = "youtube";
-                setYoutubeConnectedState();
-                applyPlatformTheme();
-                clearError();
-
-                // Proof-of-connection: confirms the token actually
-                // works before any generation-engine wiring exists.
-                fetchYoutubePlaylistsPreview();
-
-            }
         });
+
 
     return youtubeTokenClient;
 
@@ -4581,106 +4791,362 @@ function setYoutubeDisconnectedState() {
 // same retry/backoff shape as spotifyFetch — including handling
 // quota exhaustion (403 quotaExceeded) as its own clear error,
 // since that's a real, expected failure mode for this API.
-async function youtubeFetch(path, attempt = 1) {
+// =====================================================
+// YOUTUBE API FETCH
+// =====================================================
+// Supports GET and POST requests, including JSON request bodies.
+// This is important because playlist creation and adding videos
+// both require POST requests.
+
+async function youtubeFetch(
+    path,
+    options = {},
+    attempt = 1
+) {
+
+    if (!youtubeAccessToken) {
+
+        throw new Error(
+            "YOUTUBE_AUTH_EXPIRED"
+        );
+
+    }
+
+
+    const method =
+        options.method || "GET";
+
+
+    const headers = {
+
+        Authorization:
+            `Bearer ${youtubeAccessToken}`
+
+    };
+
+
+    if (options.body) {
+
+        headers["Content-Type"] =
+            "application/json";
+
+    }
+
 
     let res;
+
 
     try {
 
         res = await fetch(
             `https://www.googleapis.com/youtube/v3${path}`,
             {
-                headers: {
-                    Authorization: `Bearer ${youtubeAccessToken}`
-                }
+
+                method,
+
+                headers,
+
+                body:
+                    options.body || undefined
+
             }
         );
 
     } catch (networkErr) {
 
-        if (attempt <= 3) {
-            await sleep(500 * attempt);
-            return youtubeFetch(path, attempt + 1);
+        console.error(
+            "[YouTube network error]",
+            networkErr
+        );
+
+
+        if (attempt < 3) {
+
+            await sleep(
+                500 * attempt
+            );
+
+            return youtubeFetch(
+                path,
+                options,
+                attempt + 1
+            );
+
         }
 
-        throw new Error("NETWORK_ERROR");
+
+        throw new Error(
+            "NETWORK_ERROR"
+        );
 
     }
 
-    if (res.status >= 500 && attempt <= 3) {
-        await sleep(400 * attempt);
-        return youtubeFetch(path, attempt + 1);
+
+    // -----------------------------------------
+    // RETRY SERVER ERRORS
+    // -----------------------------------------
+
+    if (
+        res.status >= 500 &&
+        attempt < 3
+    ) {
+
+        await sleep(
+            400 * attempt
+        );
+
+        return youtubeFetch(
+            path,
+            options,
+            attempt + 1
+        );
+
     }
 
-    if (res.status === 401) {
-        throw new Error("YOUTUBE_AUTH_EXPIRED");
+
+    // -----------------------------------------
+    // AUTH EXPIRED
+    // -----------------------------------------
+
+    if (
+        res.status === 401
+    ) {
+
+        throw new Error(
+            "YOUTUBE_AUTH_EXPIRED"
+        );
+
     }
 
-    if (res.status === 403) {
+
+    // -----------------------------------------
+    // FORBIDDEN / QUOTA
+    // -----------------------------------------
+
+    if (
+        res.status === 403
+    ) {
 
         const body =
-            await res.json().catch(() => null);
+            await res.json().catch(
+                () => null
+            );
+
 
         const reason =
             body?.error?.errors?.[0]?.reason ||
+            body?.error?.status ||
             "";
 
-        if (reason === "quotaExceeded") {
-            throw new Error("YOUTUBE_QUOTA_EXCEEDED");
+
+        console.error(
+            "[YouTube 403]",
+            body
+        );
+
+
+        if (
+            reason ===
+                "quotaExceeded" ||
+            reason ===
+                "dailyLimitExceeded"
+        ) {
+
+            throw new Error(
+                "YOUTUBE_QUOTA_EXCEEDED"
+            );
+
         }
 
-        throw new Error("FORBIDDEN");
+
+        if (
+            reason ===
+                "insufficientPermissions" ||
+            reason ===
+                "forbidden"
+        ) {
+
+            throw new Error(
+                "YOUTUBE_WRITE_PERMISSION_REQUIRED"
+            );
+
+        }
+
+
+        throw new Error(
+            "FORBIDDEN"
+        );
 
     }
+
+
+    // -----------------------------------------
+    // NOT FOUND
+    // -----------------------------------------
+
+    if (
+        res.status === 404
+    ) {
+
+        throw new Error(
+            "YOUTUBE_NOT_FOUND"
+        );
+
+    }
+
+
+    // -----------------------------------------
+    // OTHER API ERRORS
+    // -----------------------------------------
 
     if (!res.ok) {
-        throw new Error(`YOUTUBE_ERROR_${res.status}`);
+
+        const body =
+            await res.json().catch(
+                () => null
+            );
+
+
+        console.error(
+            "[YouTube API error]",
+            {
+
+                status:
+                    res.status,
+
+                method,
+
+                path,
+
+                body
+
+            }
+        );
+
+
+        throw new Error(
+            `YOUTUBE_ERROR_${res.status}`
+        );
+
     }
+
+
+    // -----------------------------------------
+    // NO CONTENT
+    // -----------------------------------------
+
+    if (
+        res.status === 204
+    ) {
+
+        return null;
+
+    }
+
 
     return res.json();
 
 }
 
 
-function friendlyYoutubeMessageFor(err) {
+// =====================================================
+// YOUTUBE DATA LAYER
+// =====================================================
+// Mirrors the Spotify data layer above: fetch libraries, fetch
+// anchor candidates, build a track pool, score it — using the
+// exact same downstream functions once data is normalized.
 
-    switch (err && err.message) {
+let youtubeUserId = null;
 
-        case "NETWORK_ERROR":
-            return "Couldn't reach YouTube. Check your connection and try again.";
+// YouTube's playlistItems.list paginates via nextPageToken
+// rather than a `next` URL, unlike Spotify — otherwise the same
+// idea as spotifyFetchAllPages.
+async function youtubeFetchAllPages(basePath) {
 
-        case "YOUTUBE_AUTH_EXPIRED":
-            return "Your YouTube session expired. Please reconnect.";
+    let items = [];
+    let pageToken = null;
 
-        case "YOUTUBE_QUOTA_EXCEEDED":
-            return "YouTube's daily API quota has been used up for today. Please try again tomorrow.";
+    do {
 
-        case "FORBIDDEN":
-            return "YouTube denied that request — a scope may be missing, or this app isn't verified for that action yet.";
+        const path =
+            basePath +
+            (pageToken ? `&pageToken=${pageToken}` : "");
 
-        default:
-            return "Something went wrong talking to YouTube. Please try again.";
+        const data = await youtubeFetch(path);
 
-    }
+        items = items.concat(data.items || []);
+        pageToken = data.nextPageToken || null;
+
+    } while (pageToken);
+
+    return items;
 
 }
 
 
-// Temporary proof-of-connection check — lists the user's real
-// playlists and logs them, so we can confirm the whole auth
-// chain actually works before building the real UI for it.
-async function fetchYoutubePlaylistsPreview() {
+// YouTube has no single "get my user id" endpoint like Spotify's
+// /me — the channel ID is the closest stable per-account
+// identifier, and doubles as the way to find the special "Liked
+// videos" playlist (relatedPlaylists.likes).
+async function fetchYoutubeChannelInfo() {
+
+    const data = await youtubeFetch(
+        "/channels?part=id,contentDetails&mine=true"
+    );
+
+    const channel = data.items?.[0];
+
+    return {
+        channelId: channel?.id || null,
+        likedPlaylistId: channel?.contentDetails?.relatedPlaylists?.likes || null
+    };
+
+}
+
+
+async function loadYoutubeLibrariesAndAnchors() {
+
+    libraryList.innerHTML =
+        `<p class="placeholder-text">Loading your playlists…</p>`;
+
+    songGrid.innerHTML =
+        `<p class="placeholder-text">Loading your top songs…</p>`;
 
     try {
 
-        const data = await youtubeFetch(
-            "/playlists?part=snippet,contentDetails&mine=true&maxResults=25"
-        );
+        const [playlistsData, channelInfo] = await Promise.all([
+            youtubeFetch("/playlists?part=snippet,contentDetails&mine=true&maxResults=50"),
+            fetchYoutubeChannelInfo()
+        ]);
 
-        console.log(
-            "[GenPlaylist] YouTube playlists:",
-            data.items
-        );
+        youtubeUserId = channelInfo.channelId;
+        youtubeLikedPlaylistId = channelInfo.likedPlaylistId;
+
+        const normalizedPlaylists =
+            (playlistsData.items || []).map(normalizeYoutubePlaylist);
+
+        // Liked videos rendered the same way Spotify's Liked
+        // Songs pseudo-library is — reuses renderLibraries
+        // unchanged since both are now Spotify-shaped.
+        let likedCount = 0;
+
+        if (youtubeLikedPlaylistId) {
+
+            try {
+
+                const likedPreview = await youtubeFetch(
+                    `/playlistItems?part=id&playlistId=${encodeURIComponent(youtubeLikedPlaylistId)}&maxResults=1`
+                );
+
+                likedCount = likedPreview.pageInfo?.totalResults || 0;
+
+            } catch (likedErr) {
+                // Non-fatal — playlists still render without this.
+            }
+
+        }
+
+        renderLibraries(normalizedPlaylists, likedCount);
 
     } catch (err) {
 
@@ -4689,14 +5155,226 @@ async function fetchYoutubePlaylistsPreview() {
             setYoutubeDisconnectedState();
         }
 
+        libraryList.innerHTML =
+            `<p class="placeholder-text">Couldn't load your playlists.</p>`;
+
         showError(
             friendlyYoutubeMessageFor(err),
-            { retry: fetchYoutubePlaylistsPreview }
+            { retry: loadYoutubeLibrariesAndAnchors }
         );
+
+        return;
+
+    }
+
+    // Anchor candidates: YouTube has no personalized "top
+    // videos" signal, so the most recently liked videos are used
+    // as a proxy — clearly not the same as Spotify's real
+    // listening-based top tracks, but the closest available.
+    try {
+
+        if (!youtubeLikedPlaylistId) {
+            songGrid.innerHTML =
+                `<p class="placeholder-text">No liked videos found to suggest anchors from.</p>`;
+            return;
+        }
+
+        const recentLiked = await youtubeFetch(
+            `/playlistItems?part=snippet,contentDetails&playlistId=${encodeURIComponent(youtubeLikedPlaylistId)}&maxResults=8`
+        );
+
+        const items = recentLiked.items || [];
+        const videoIds = items.map(item => item.contentDetails?.videoId).filter(Boolean);
+        const videoDetailsById = await fetchYoutubeVideoDetails(videoIds);
+
+        const normalizedAnchors =
+            items
+                .map(item => normalizeYoutubeTrack(item, videoDetailsById.get(item.contentDetails?.videoId)))
+                .filter(Boolean);
+
+        renderTopSongs(normalizedAnchors);
+
+    } catch (err) {
+
+        songGrid.innerHTML =
+            `<p class="placeholder-text">Couldn't load anchor suggestions.</p>`;
 
     }
 
 }
+
+
+// Video duration/full details only come from videos.list, not
+// playlistItems.list — batched up to 50 IDs per call (YouTube's
+// max), returned as a Map keyed by video ID for easy merging.
+async function fetchYoutubeVideoDetails(videoIds) {
+
+    const detailsById = new Map();
+    const CHUNK_SIZE = 50;
+
+    for (let i = 0; i < videoIds.length; i += CHUNK_SIZE) {
+
+        const chunk = videoIds.slice(i, i + CHUNK_SIZE);
+
+        if (chunk.length === 0) {
+            continue;
+        }
+
+        const data = await youtubeFetch(
+            `/videos?part=contentDetails&id=${chunk.join(",")}`
+        );
+
+        (data.items || []).forEach(video => {
+            detailsById.set(video.id, video);
+        });
+
+    }
+
+    return detailsById;
+
+}
+
+
+async function buildYoutubeTrackPool(selectedLibraries) {
+
+    const requests =
+        selectedLibraries.map(source => {
+
+            const playlistId =
+                source.isLiked ? youtubeLikedPlaylistId : source.id;
+
+            if (!playlistId) {
+                return Promise.resolve([]);
+            }
+
+            return youtubeFetchAllPages(
+                `/playlistItems?part=snippet,contentDetails&playlistId=${encodeURIComponent(playlistId)}&maxResults=50`
+            );
+
+        });
+
+    const results = await Promise.allSettled(requests);
+
+    const rawItems = [];
+
+    results.forEach(result => {
+        if (result.status === "fulfilled") {
+            rawItems.push(...result.value);
+        }
+    });
+
+    // Deleted/private videos show up with this placeholder title
+    // — filter them out rather than showing broken entries.
+    const validItems =
+        rawItems.filter(item =>
+            item.snippet?.title &&
+            item.snippet.title !== "Private video" &&
+            item.snippet.title !== "Deleted video"
+        );
+
+    const videoIds =
+        validItems
+            .map(item => item.contentDetails?.videoId)
+            .filter(Boolean);
+
+    const videoDetailsById = await fetchYoutubeVideoDetails(videoIds);
+
+    const tracksById = new Map();
+
+    validItems.forEach(item => {
+
+        const track = normalizeYoutubeTrack(
+            item,
+            videoDetailsById.get(item.contentDetails?.videoId)
+        );
+
+        if (track && !tracksById.has(track.id)) {
+            tracksById.set(track.id, track);
+        }
+
+    });
+
+    return Array.from(tracksById.values());
+
+}
+
+
+// =====================================================
+// LIBRARY SOURCE TOGGLE
+// =====================================================
+// Lets the person pick which connected platform's data
+// populates Libraries/Anchors/Generate. Deliberately a toggle,
+// not a merge — merging both platforms into one pool is a
+// bigger feature to build on top of this later if wanted.
+
+let activeLibrarySource = "spotify";
+
+const librarySourceBar =
+    document.getElementById("librarySourceBar");
+
+const sourceSpotifyBtn =
+    document.getElementById("sourceSpotifyBtn");
+
+const sourceYoutubeBtn =
+    document.getElementById("sourceYoutubeBtn");
+
+
+// Only worth showing the toggle once more than one platform is
+// actually connected — otherwise there's nothing to switch
+// between, and it'd just be a confusing extra control.
+function updateLibrarySourceBar() {
+
+    if (!librarySourceBar) {
+        return;
+    }
+
+    const bothConnected =
+        Boolean(spotifyAccessToken) && Boolean(youtubeAccessToken);
+
+    librarySourceBar.classList.toggle("hidden", !bothConnected);
+
+}
+
+
+async function setActiveLibrarySource(source) {
+
+    activeLibrarySource = source;
+
+    sourceSpotifyBtn?.classList.toggle("active", source === "spotify");
+    sourceYoutubeBtn?.classList.toggle("active", source === "youtube");
+
+    updateSaveButtonLabel();
+
+    if (source === "spotify") {
+
+        if (!spotifyAccessToken) {
+            return;
+        }
+
+        await loadLibrariesAndAnchors();
+
+    } else {
+
+        if (!youtubeAccessToken) {
+            return;
+        }
+
+        await loadYoutubeLibrariesAndAnchors();
+
+    }
+
+}
+
+
+sourceSpotifyBtn?.addEventListener(
+    "click",
+    () => setActiveLibrarySource("spotify")
+);
+
+sourceYoutubeBtn?.addEventListener(
+    "click",
+    () => setActiveLibrarySource("youtube")
+);
 
 
 youtubeLoginButtons.forEach(
@@ -4711,6 +5389,13 @@ youtubeLoginButtons.forEach(
                     lastConnectedPlatform =
                         spotifyAccessToken ? "spotify" : null;
                     applyPlatformTheme();
+                }
+
+                updateLibrarySourceBar();
+                updateHistoryPlatformTabs();
+
+                if (activeLibrarySource === "youtube" && spotifyAccessToken) {
+                    setActiveLibrarySource("spotify");
                 }
 
                 setYoutubeDisconnectedState();

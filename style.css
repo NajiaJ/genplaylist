@@ -69,6 +69,20 @@ body.theme-youtube {
 
 }
 
+body.theme-youtube #savePlaylistBtn,
+body.theme-youtube #historySaveBtn {
+    background: #FF0000;
+    color: #FFFFFF;
+    border-color: #FF0000;
+}
+
+body.theme-youtube #savePlaylistBtn:hover,
+body.theme-youtube #historySaveBtn:hover {
+    background: #CC0000;
+    border-color: #CC0000;
+    color: #FFFFFF;
+}
+
 
 /* ==========================================
    RESET
@@ -414,6 +428,37 @@ button:active {
     display: flex;
 
     justify-content: flex-end;
+
+}
+
+
+.library-source-bar {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 14px;
+
+    flex-wrap: wrap;
+
+}
+
+
+.library-source-label {
+
+    color: var(--text-secondary);
+
+    font-size: .85rem;
+
+    font-weight: 600;
+
+}
+
+
+.history-platform-tabs {
+
+    margin-bottom: 16px;
 
 }
 

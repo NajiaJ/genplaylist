@@ -237,6 +237,35 @@
             </div>
 
 
+            <div
+                id="historyPlatformTabs"
+                class="size-mode-toggle history-platform-tabs hidden"
+            >
+
+                <button
+                    type="button"
+                    id="historyTabSpotify"
+                    class="size-mode-option active"
+                    data-history-platform="spotify"
+                >
+                    <i class="fa-brands fa-spotify"></i>
+                    <span>Spotify</span>
+                </button>
+
+
+                <button
+                    type="button"
+                    id="historyTabYoutube"
+                    class="size-mode-option"
+                    data-history-platform="youtube"
+                >
+                    <i class="fa-brands fa-youtube"></i>
+                    <span>YouTube Music</span>
+                </button>
+
+            </div>
+
+
             <div id="historyList" class="history-list">
 
                 <p class="placeholder-text">
@@ -263,7 +292,7 @@
                 
                     <button
                         class="spotify-btn"
-                        id="historySaveSpotifyBtn"
+                        id="historySaveBtn"
                         type="button"
                     >
                         Save to Spotify
@@ -273,12 +302,51 @@
             
             <h3 id="historyTrackViewTitle"></h3>
 
-                <h3 id="historyTrackViewTitle"></h3>
-
                 <div
                     id="historyTrackList"
                     class="playlist-preview"
                 ></div>
+
+            </div>
+
+        </section>
+
+
+        <!-- ======================================
+             LIBRARY SOURCE
+        ======================================= -->
+
+        <section
+            id="librarySourceBar"
+            class="library-source-bar hidden"
+        >
+
+            <span class="library-source-label">
+                Generate from:
+            </span>
+
+            <div class="size-mode-toggle">
+
+                <button
+                    type="button"
+                    id="sourceSpotifyBtn"
+                    class="size-mode-option active"
+                    data-source="spotify"
+                >
+                    <i class="fa-brands fa-spotify"></i>
+                    <span>Spotify</span>
+                </button>
+
+
+                <button
+                    type="button"
+                    id="sourceYoutubeBtn"
+                    class="size-mode-option"
+                    data-source="youtube"
+                >
+                    <i class="fa-brands fa-youtube"></i>
+                    <span>YouTube Music</span>
+                </button>
 
             </div>
 
@@ -693,16 +761,7 @@
 
                     <button
                         class="spotify-btn"
-                        id="saveDbBtn"
-                        type="button"
-                    >
-                        Save Playlist
-                    </button>
-
-
-                    <button
-                        class="spotify-btn"
-                        id="saveSpotifyBtn"
+                        id="savePlaylistBtn"
                         type="button"
                     >
                         Save to Spotify
