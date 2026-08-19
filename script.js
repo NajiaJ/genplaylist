@@ -1124,6 +1124,13 @@ function logoutFromGenPlaylist() {
     sessionStorage.removeItem(
         "spotify_pkce_verifier"
     );
+    
+    // Also log out of the Spotify browser session.
+    window.open(
+        "https://accounts.spotify.com/logout",
+        "_blank",
+        "noopener,noreferrer"
+    );
 
     // Immediately update Spotify buttons
     setSpotifyDisconnectedState();
