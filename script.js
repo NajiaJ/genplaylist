@@ -1043,117 +1043,6 @@ function friendlyMessageFor(error) {
 
 }
 
-// =====================================================
-// FRIENDLY YOUTUBE ERROR MESSAGES
-// =====================================================
-
-function friendlyYoutubeMessageFor(error) {
-
-    const message =
-        error?.message ||
-        "";
-
-
-    if (
-        message ===
-        "YOUTUBE_AUTH_EXPIRED"
-    ) {
-
-        return (
-            "Your YouTube Music session expired. " +
-            "Please reconnect your account."
-        );
-
-    }
-
-
-    if (
-        message ===
-        "YOUTUBE_QUOTA_EXCEEDED"
-    ) {
-
-        return (
-            "YouTube's daily API limit has been reached. " +
-            "Please try again later."
-        );
-
-    }
-
-
-    if (
-        message ===
-        "YOUTUBE_WRITE_PERMISSION_REQUIRED"
-    ) {
-
-        return (
-            "GenPlaylist doesn't have permission to save " +
-            "playlists to your YouTube account. " +
-            "Please reconnect YouTube Music and allow playlist access."
-        );
-
-    }
-
-
-    if (
-        message ===
-        "YOUTUBE_NO_VIDEOS_ADDED"
-    ) {
-
-        return (
-            "YouTube couldn't add any of these songs to the playlist. " +
-            "Try generating the playlist again."
-        );
-
-    }
-
-
-    if (
-        message ===
-        "YOUTUBE_NOT_FOUND"
-    ) {
-
-        return (
-            "The YouTube playlist could not be created. " +
-            "Please reconnect YouTube Music and try again."
-        );
-
-    }
-
-
-    if (
-        message.startsWith(
-            "YOUTUBE_ERROR_"
-        )
-    ) {
-
-        return (
-            "YouTube couldn't save this playlist. " +
-            "Some videos may not be available for playlists."
-        );
-
-    }
-
-
-    if (
-        message ===
-        "NETWORK_ERROR"
-    ) {
-
-        return (
-            "We couldn't reach YouTube. " +
-            "Please check your connection and try again."
-        );
-
-    }
-
-
-    return (
-        "YouTube Music couldn't save this playlist. " +
-        "Please try again."
-    );
-
-}
-
 
 // =====================================================
 // LOGIN BUTTON STATE
@@ -1166,11 +1055,13 @@ function friendlyYoutubeMessageFor(error) {
 let lastConnectedPlatform = null;
 
 function applyPlatformTheme() {
-    if (currentPlatform === "youtube") {
+
+    if (activeLibrarySource === "youtube") {
         document.body.classList.add("theme-youtube");
     } else {
         document.body.classList.remove("theme-youtube");
     }
+
 }
 
 
@@ -1234,67 +1125,78 @@ function logoutFromGenPlaylist() {
 
     hidePlaylistHistory();
 
-    if (lastConnectedPlatform === "spotify") {
+
+    // If YouTube Music is still connected,
+    // keep the dashboard available.
+    if (youtubeAccessToken) {
+
+        if (
+            activeLibrarySource ===
+            "spotify"
+        ) {
+            setActiveLibrarySource(
+                "youtube"
+            );
+        }
+
         lastConnectedPlatform =
-            youtubeAccessToken ? "youtube" : null;
+            "youtube";
+
         applyPlatformTheme();
+
+        updateLibrarySourceBar();
+        updateHistoryPlatformTabs();
+
+        showDashboard();
+
+        clearError();
+
+        return;
     }
+
+
+    // Neither platform is connected.
+    lastConnectedPlatform =
+        null;
+
+    applyPlatformTheme();
 
     updateLibrarySourceBar();
     updateHistoryPlatformTabs();
 
-    if (activeLibrarySource === "spotify" && youtubeAccessToken) {
-        setActiveLibrarySource("youtube");
-    }
-
-    sessionStorage.removeItem(
-        "spotify_pkce_verifier"
-    );
-
-    // Best-effort: also end the Spotify browser session itself.
-    // An invisible iframe to Spotify's logout page won't work —
-    // accounts.spotify.com sends X-Frame-Options: deny — so a
-    // real new tab is the only reliable way to trigger it. This
-    // app's own logout (above) always succeeds regardless of
-    // whether the user closes that tab or not.
-    window.open(
-        "https://accounts.spotify.com/logout",
-        "_blank",
-        "noopener,noreferrer"
-    );
-
-    setSpotifyDisconnectedState();
-
     hideDashboard();
+
 
     if (libraryList) {
 
         libraryList.innerHTML =
             `
             <p class="placeholder-text">
-                Connect to Spotify to see your playlists here.
+                Connect to Spotify or YouTube Music
+                to see your playlists here.
             </p>
             `;
 
     }
+
 
     if (songGrid) {
 
         songGrid.innerHTML =
             `
             <p class="placeholder-text">
-                Connect to Spotify to see your top songs here.
+                Connect to Spotify or YouTube Music
+                to see your top songs here.
             </p>
             `;
 
     }
 
+
     if (playlistPreview) {
-
-        playlistPreview.innerHTML =
-            "";
-
+        playlistPreview.innerHTML = "";
     }
+
 
     loadingSection?.classList.add(
         "hidden"
@@ -3661,95 +3563,32 @@ function getPlatformTrackUris(tracks, platform) {
 }
 
 
-async function createAndPopulatePlatformPlaylist(
-    platform,
-    name,
-    trackUris
-) {
+async function createAndPopulatePlatformPlaylist(platform, name, trackUris) {
 
-    if (
-        platform === "youtube"
-    ) {
+    if (platform === "youtube") {
 
-        if (!youtubeAccessToken) {
+        const playlist = await createYoutubePlaylist(name);
 
-            throw new Error(
-                "YOUTUBE_AUTH_EXPIRED"
-            );
-
-        }
-
-
-        const playlist =
-            await createYoutubePlaylist(
-                name
-            );
-
-
-        if (
-            !playlist?.id
-        ) {
-
-            throw new Error(
-                "YOUTUBE_NOT_FOUND"
-            );
-
-        }
-
-
-        await addVideosToYoutubePlaylist(
-            playlist.id,
-            trackUris
-        );
-
+        await addVideosToYoutubePlaylist(playlist.id, trackUris);
 
         return {
-
-            id:
-                playlist.id,
-
-            url:
-                `https://music.youtube.com/playlist?list=${encodeURIComponent(
-                    playlist.id
-                )}`
-
+            id: playlist.id,
+            url: `https://music.youtube.com/playlist?list=${encodeURIComponent(
+                playlist.id
+            )}`
         };
 
     }
 
+    const currentUser = await spotifyFetch("/me");
 
-    // -----------------------------------------
-    // SPOTIFY
-    // -----------------------------------------
+    const playlist = await createSpotifyPlaylist(currentUser.id, name);
 
-    const currentUser =
-        await spotifyFetch(
-            "/me"
-        );
-
-
-    const playlist =
-        await createSpotifyPlaylist(
-            currentUser.id,
-            name
-        );
-
-
-    await addTracksToSpotifyPlaylist(
-        playlist.id,
-        trackUris
-    );
-
+    await addTracksToSpotifyPlaylist(playlist.id, trackUris);
 
     return {
-
-        id:
-            playlist.id,
-
-        url:
-            playlist.external_urls?.spotify ||
-            null
-
+        id: playlist.id,
+        url: playlist.external_urls?.spotify || null
     };
 
 }
@@ -4156,131 +3995,32 @@ async function createYoutubePlaylist(
 // free 10,000/day quota. That's why the save flow below caps
 // YouTube saves to a smaller size by default.
 
-// =====================================================
-// ADD VIDEOS TO YOUTUBE PLAYLIST
-// =====================================================
+async function addVideosToYoutubePlaylist(playlistId, videoIds) {
 
-// =====================================================
-// ADD VIDEOS TO YOUTUBE PLAYLIST
-// =====================================================
+    for (const videoId of videoIds) {
 
-async function addVideosToYoutubePlaylist(
-    playlistId,
-    videoIds
-) {
+        await youtubeFetch(
+            "/playlistItems?part=snippet",
+            {
 
-    if (!playlistId) {
+                method: "POST",
 
-        throw new Error(
-            "YOUTUBE_NOT_FOUND"
+                body: JSON.stringify({
+
+                    snippet: {
+                        playlistId,
+                        resourceId: {
+                            kind: "youtube#video",
+                            videoId
+                        }
+                    }
+
+                })
+
+            }
         );
 
     }
-
-
-    if (
-        !Array.isArray(videoIds) ||
-        videoIds.length === 0
-    ) {
-
-        return {
-            added: 0,
-            skipped: 0
-        };
-
-    }
-
-
-    // Remove empty IDs and duplicates before sending
-    // anything to YouTube.
-    const uniqueVideoIds =
-        [...new Set(
-            videoIds.filter(Boolean)
-        )];
-
-
-    let added = 0;
-    let skipped = 0;
-
-
-    for (
-        const videoId of uniqueVideoIds
-    ) {
-
-        try {
-
-            await youtubeFetch(
-                "/playlistItems?part=snippet",
-                {
-
-                    method:
-                        "POST",
-
-                    body:
-                        JSON.stringify({
-
-                            snippet: {
-
-                                playlistId,
-
-                                resourceId: {
-
-                                    kind:
-                                        "youtube#video",
-
-                                    videoId
-
-                                }
-
-                            }
-
-                        })
-
-                }
-            );
-
-
-            added++;
-
-
-        } catch (error) {
-
-            console.warn(
-                "[YouTube] Skipping video:",
-                videoId,
-                error
-            );
-
-
-            skipped++;
-
-        }
-
-    }
-
-
-    console.log(
-        `[YouTube] Playlist complete: ${added} added, ${skipped} skipped.`
-    );
-
-
-    // Only fail if absolutely nothing could be added.
-    if (
-        added === 0 &&
-        uniqueVideoIds.length > 0
-    ) {
-
-        throw new Error(
-            "YOUTUBE_NO_VIDEOS_ADDED"
-        );
-
-    }
-
-
-    return {
-        added,
-        skipped
-    };
 
 }
 
@@ -4768,121 +4508,63 @@ let youtubeTokenClient = null;
 
 function getYoutubeTokenClient() {
 
-    if (
-        youtubeTokenClient
-    ) {
-
+    if (youtubeTokenClient) {
         return youtubeTokenClient;
-
     }
-
 
     const PLACEHOLDER_YOUTUBE_CLIENT_ID =
         "PASTE_YOUR_GOOGLE_OAUTH_CLIENT_ID_HERE";
 
-
     if (
         !YOUTUBE_CLIENT_ID ||
-        YOUTUBE_CLIENT_ID ===
-            PLACEHOLDER_YOUTUBE_CLIENT_ID
+        YOUTUBE_CLIENT_ID === PLACEHOLDER_YOUTUBE_CLIENT_ID
     ) {
-
-        throw new Error(
-            "YOUTUBE_NOT_CONFIGURED"
-        );
-
+        throw new Error("YOUTUBE_NOT_CONFIGURED");
     }
-
 
     if (
         !window.google ||
         !window.google.accounts ||
         !window.google.accounts.oauth2
     ) {
-
-        throw new Error(
-            "YOUTUBE_LIBRARY_MISSING"
-        );
-
+        throw new Error("YOUTUBE_LIBRARY_MISSING");
     }
-
 
     youtubeTokenClient =
         window.google.accounts.oauth2.initTokenClient({
+            client_id: YOUTUBE_CLIENT_ID,
+            scope: YOUTUBE_SCOPES,
+            callback: (response) => {
 
-            client_id:
-                YOUTUBE_CLIENT_ID,
-
-            scope:
-                YOUTUBE_SCOPES,
-
-            callback:
-                response => {
-
-                    if (
-                        response.error
-                    ) {
-
-                        showError(
-                            `YouTube sign-in was cancelled or denied (${response.error}).`
-                        );
-
-                        return;
-
-                    }
-
-
-                    youtubeAccessToken =
-                        response.access_token;
-
-
-                    console.log(
-                        "[YouTube OAuth]",
-                        {
-
-                            hasToken:
-                                Boolean(
-                                    youtubeAccessToken
-                                ),
-
-                            tokenLength:
-                                youtubeAccessToken?.length,
-
-                            scope:
-                                response.scope,
-
-                            expiresIn:
-                                response.expires_in
-
-                        }
+                if (response.error) {
+                    showError(
+                        `YouTube sign-in was cancelled or denied (${response.error}).`
                     );
-
-
-                    lastConnectedPlatform =
-                        "youtube";
-
-
-                    setYoutubeConnectedState();
-
-                    applyPlatformTheme();
-
-                    showDashboard();
-
-                    clearError();
-
-                    updateLibrarySourceBar();
-
-                    updateHistoryPlatformTabs();
-
-
-                    setActiveLibrarySource(
-                        "youtube"
-                    );
-
+                    return;
                 }
 
-        });
+                youtubeAccessToken = response.access_token;
+                console.log(
+                    "[YouTube OAuth]",
+                    {
+                        hasToken: Boolean(youtubeAccessToken),
+                        tokenLength: youtubeAccessToken?.length,
+                        scope: response.scope,
+                        expiresIn: response.expires_in
+                    }
+                );
+                lastConnectedPlatform = "youtube";
+                setYoutubeConnectedState();
+                applyPlatformTheme();
+                showDashboard();
+                clearError();
 
+                updateLibrarySourceBar();
+                updateHistoryPlatformTabs();
+                setActiveLibrarySource("youtube");
+
+            }
+        });
 
     return youtubeTokenClient;
 
@@ -4928,7 +4610,7 @@ function setYoutubeConnectedState() {
     youtubeLoginButtons.forEach(
         button => {
 
-            button.textContent = "Youtube Music Log Out";
+            button.textContent = "YouTube Log Out";
             button.classList.add("logout-state");
 
         }
@@ -5170,50 +4852,31 @@ async function youtubeFetch(
             await res.json().catch(
                 () => null
             );
-    
-    
-        const reason =
-            body?.error?.errors?.[0]?.reason ||
-            body?.error?.status ||
-            "";
-    
-    
+
+
         console.error(
             "[YouTube API error]",
             {
+
                 status:
                     res.status,
-    
+
                 method,
-    
+
                 path,
-    
-                reason,
-    
+
                 body
+
             }
         );
-    
-    
-        const error =
-            new Error(
-                `YOUTUBE_ERROR_${res.status}`
-            );
-    
-    
-        error.status =
-            res.status;
-    
-        error.reason =
-            reason;
-    
-        error.youtubeBody =
-            body;
-    
-    
-        throw error;
-    
+
+
+        throw new Error(
+            `YOUTUBE_ERROR_${res.status}`
+        );
+
     }
+
 
     // -----------------------------------------
     // NO CONTENT
@@ -5524,10 +5187,20 @@ async function setActiveLibrarySource(source) {
 
     activeLibrarySource = source;
 
-    sourceSpotifyBtn?.classList.toggle("active", source === "spotify");
-    sourceYoutubeBtn?.classList.toggle("active", source === "youtube");
+    sourceSpotifyBtn?.classList.toggle(
+        "active",
+        source === "spotify"
+    );
+
+    sourceYoutubeBtn?.classList.toggle(
+        "active",
+        source === "youtube"
+    );
+
+    applyPlatformTheme();
 
     updateSaveButtonLabel();
+
 
     if (source === "spotify") {
 
