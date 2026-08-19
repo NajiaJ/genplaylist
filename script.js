@@ -1117,10 +1117,7 @@ function setSpotifyDisconnectedState() {
 
 function logoutFromGenPlaylist() {
 
-    // ------------------------------------------
-    // 1. Immediately disconnect Spotify
-    // ------------------------------------------
-
+    // Immediately disconnect Spotify
     spotifyAccessToken = null;
     spotifyUserId = null;
 
@@ -1128,21 +1125,18 @@ function logoutFromGenPlaylist() {
         "spotify_pkce_verifier"
     );
 
-    // Immediately change the Spotify buttons
-    // back to "Connect to Spotify".
+    // Immediately update Spotify buttons
     setSpotifyDisconnectedState();
 
 
     // ------------------------------------------
-    // 2. If YouTube is still connected,
-    //    keep the dashboard open.
+    // YouTube is still connected
     // ------------------------------------------
 
     if (youtubeAccessToken) {
 
-        if (activeLibrarySource === "spotify") {
-            activeLibrarySource = "youtube";
-        }
+        // Switch to YouTube properly.
+        setActiveLibrarySource("youtube");
 
         updateLibrarySourceBar();
         updateHistoryPlatformTabs();
@@ -1156,18 +1150,21 @@ function logoutFromGenPlaylist() {
 
 
     // ------------------------------------------
-    // 3. Neither platform is connected.
-    //    Return to the hero landing page.
+    // Neither platform is connected
     // ------------------------------------------
 
     activeLibrarySource = "spotify";
+
+    lastConnectedPlatform = null;
+
+    applyPlatformTheme();
 
     updateLibrarySourceBar();
     updateHistoryPlatformTabs();
 
     hideDashboard();
 
-    // Show the landing/hero section again.
+    // Show the landing page.
     welcomeHero?.classList.remove(
         "hidden"
     );
